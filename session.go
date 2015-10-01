@@ -56,7 +56,6 @@ func (s *SessionStore) CheckAuthorizationCode(code Secret, redirectURI string) e
 		return ErrorAccessDenied
 	}
 	if authCode.IsExpired() {
-		println("EXPIRED")
 		return ErrorAccessDenied
 	}
 	return nil
