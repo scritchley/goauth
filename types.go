@@ -22,9 +22,12 @@ const (
 	ResponseTypeCode = "code"
 )
 
+// GrantType is a string representing the grant type to use
+// when requesting a new grant.
 type GrantType string
 
 const (
+	// GrantTypeAuthorizationCode is the grant type used for the Authorization Code Grant strategy.
 	GrantTypeAuthorizationCode = "authorization_code"
 )
 

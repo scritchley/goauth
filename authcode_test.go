@@ -2,6 +2,7 @@ package goauth
 
 import (
 	"bytes"
+	"encoding/json"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
@@ -93,6 +94,16 @@ func TestAuthCodeHandler(t *testing.T) {
 	if !ok {
 		t.Error("Test failed, token handler not generated")
 	}
+
+	// Generate a method to check the authentication of a request
+	securedHandler := checkAuth(TokenTypeBearer, ss, []string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("approved"))
+	})
+
+	// Generate a method to check the authentication of a request with a slightly different scope
+	securedHandlerDifferentScope := checkAuth(TokenTypeBearer, ss, []string{"securescope"}, func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("approved"))
+	})
 
 	testCases([]testCase{
 		// Should throw an error due to no client id being passed on the request
@@ -231,9 +242,22 @@ func TestAuthCodeHandler(t *testing.T) {
 				if r.Code != 200 {
 					t.Errorf("Test failed, status %v", r.Code)
 				}
-				expected := []byte(`{"access_token":"testtoken","token_type":"bearer","expires_in":3600,"refresh_token":"testtoken"}` + "\n")
-				if !bytes.Equal(r.Body.Bytes(), expected) {
-					t.Errorf("Test failed, expected %s but got %s", expected, r.Body.Bytes())
+				m := make(map[string]interface{})
+				err := json.Unmarshal(r.Body.Bytes(), &m)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if m["access_token"] != "testtoken" {
+					t.Errorf("Test failed, got %s but expected something else", r.Body.Bytes())
+				}
+				if m["refresh_token"] != "testtoken" {
+					t.Errorf("Test failed, got %s but expected something else", r.Body.Bytes())
+				}
+				if m["expires_in"] != 3600.00 {
+					t.Errorf("Test failed, got %s but expected something else", r.Body.Bytes())
+				}
+				if m["token_type"] != "bearer" {
+					t.Errorf("Test failed, got %s but expected something else", r.Body.Bytes())
 				}
 			},
 		},
@@ -296,6 +320,80 @@ func TestAuthCodeHandler(t *testing.T) {
 				}
 			},
 		},
+		// Should throw an error attempting to access a secure resource
+		{
+			"GET",
+			"",
+			nil,
+			securedHandler,
+			func(r *http.Request) {
+			},
+			func(r *httptest.ResponseRecorder) {
+				if r.Code != 401 {
+					t.Errorf("Test failed, status %v", r.Code)
+				}
+				expected := []byte(`{"code":"access_denied","description":"The resource owner or authorization server denied the request."}` + "\n")
+				if !bytes.Equal(r.Body.Bytes(), expected) {
+					t.Errorf("Test failed, expected %s but got %s", expected, r.Body.Bytes())
+				}
+			},
+		},
+		// Should disallow the request as the token is incorrectly formatted
+		{
+			"GET",
+			"",
+			nil,
+			securedHandler,
+			func(r *http.Request) {
+				r.Header.Set("Authorization", "Bearer: testtoken")
+			},
+			func(r *httptest.ResponseRecorder) {
+				if r.Code != 401 {
+					t.Errorf("Test failed, status %v", r.Code)
+				}
+				expected := []byte(`{"code":"access_denied","description":"The resource owner or authorization server denied the request."}` + "\n")
+				if !bytes.Equal(r.Body.Bytes(), expected) {
+					t.Errorf("Test failed, expected %s but got %s", expected, r.Body.Bytes())
+				}
+			},
+		},
+		// Should disallow the request as the client is not authorized for this scope
+		{
+			"GET",
+			"",
+			nil,
+			securedHandlerDifferentScope,
+			func(r *http.Request) {
+				r.Header.Set("Authorization", "Bearer testtoken")
+			},
+			func(r *httptest.ResponseRecorder) {
+				if r.Code != 401 {
+					t.Errorf("Test failed, status %v", r.Code)
+				}
+				expected := []byte(`{"code":"access_denied","description":"The resource owner or authorization server denied the request."}` + "\n")
+				if !bytes.Equal(r.Body.Bytes(), expected) {
+					t.Errorf("Test failed, expected %s but got %s", expected, r.Body.Bytes())
+				}
+			},
+		},
+		// Should allow the request as a valid token is passed
+		{
+			"GET",
+			"",
+			nil,
+			securedHandler,
+			func(r *http.Request) {
+				r.Header.Set("Authorization", "Bearer testtoken")
+			},
+			func(r *httptest.ResponseRecorder) {
+				if r.Code != 200 {
+					t.Errorf("Test failed, status %v", r.Code)
+				}
+				expected := []byte(`approved`)
+				if !bytes.Equal(r.Body.Bytes(), expected) {
+					t.Errorf("Test failed, expected %s but got %s", expected, r.Body.Bytes())
+				}
+			},
+		},
 	})
-
 }

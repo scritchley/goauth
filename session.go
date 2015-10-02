@@ -32,20 +32,24 @@ func NewSessionStore(backend SessionStoreBackend) *SessionStore {
 
 // NewGrant creates a new grant and saves it in the session store returning the
 // new grant and any error that occurs.
-func (s *SessionStore) NewGrant() (Grant, error) {
+func (s *SessionStore) NewGrant(client Client) (Grant, error) {
 	grant := Grant{}
+	// Set the client on the grant
+	grant.Client = client
 	// Refresh to initialise the grant properties
 	grant.Refresh()
 	// Check whether there is an existing grant with this access token
 	existing, err := s.GetGrant(grant.AccessToken)
 	// If there is an existing grant then start over
 	if err == nil && existing.AccessToken == grant.AccessToken {
-		return s.NewGrant()
+		return s.NewGrant(client)
 	}
 	// Otherwise return the grant and add it to the session store.
 	return grant, s.PutGrant(grant)
 }
 
+// CheckAuthorizationCode retrieves an AuthorizationCode and validates it against the given
+// code and redirect URI. It returns an error if the code is invalid or any other errors occur.
 func (s *SessionStore) CheckAuthorizationCode(code Secret, redirectURI string) error {
 	authCode, err := s.GetAuthorizationCode(code)
 	if err != nil {
@@ -55,10 +59,31 @@ func (s *SessionStore) CheckAuthorizationCode(code Secret, redirectURI string) e
 	if authCode.RedirectURI != "" && authCode.RedirectURI != redirectURI {
 		return ErrorAccessDenied
 	}
+	// Check that the code is not expired.
 	if authCode.IsExpired() {
 		return ErrorAccessDenied
 	}
 	return nil
+}
+
+// CheckGrant returns a Grant from the session store and checks that it has not
+// expired. If the grant does not exist or has expired then an error is returned.
+func (s *SessionStore) CheckGrant(accessToken Secret) (Grant, error) {
+	grant, err := s.GetGrant(accessToken)
+	if err != nil {
+		return grant, err
+	}
+	if grant.IsExpired() {
+		// In the event that the grant has expired, ensure that it is deleted
+		// from the session store. In practice, SessionStoreBackend implementations
+		// should apply some form of TTL to the Grant when it is stored.
+		err := s.DeleteGrant(accessToken)
+		if err == nil {
+			err = ErrorAccessDenied
+		}
+		return grant, err
+	}
+	return grant, nil
 }
 
 // MemSessionStoreBackend is an in-memory session store, implementing the SessionStore interface.

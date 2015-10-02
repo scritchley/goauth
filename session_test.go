@@ -13,7 +13,7 @@ func TestSessionStore(t *testing.T) {
 		make(map[string]Grant),
 		make(map[string]AuthorizationCode),
 	})
-	grant, _ := ss.NewGrant()
+	grant, _ := ss.NewGrant(&testClient{})
 	grant2, err := ss.GetGrant(grant.AccessToken)
 	if err != nil {
 		t.Fatal(err)

@@ -196,7 +196,7 @@ func generateAuthCodeTokenRequestHandler(acg AuthorizationCodeGrant, sessionStor
 			DefaultErrorHandler(w, err)
 			return
 		}
-		grant, err := sessionStore.NewGrant()
+		grant, err := sessionStore.NewGrant(client)
 		if err != nil {
 			DefaultErrorHandler(w, err)
 			return

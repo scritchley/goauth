@@ -5,11 +5,11 @@ import (
 	"net/http"
 )
 
-// ErrorHandler is a function that accepts a http.ResponseWriter and Error
+// ErrorHandler is a function that accepts a http.ResponseWriter and Error.
 type ErrorHandler func(w http.ResponseWriter, e Error)
 
 var (
-	// DefaultErrorHandler can be overriden in order to implement a custom error handler
+	// DefaultErrorHandler can be overriden in order to implement a custom error handler.
 	DefaultErrorHandler = defaultErrorHandler
 )
 
@@ -23,13 +23,15 @@ func defaultErrorHandler(w http.ResponseWriter, e error) {
 	}
 }
 
+// Error is an error type that can be used in response to failing authentication attempts.
 type Error struct {
 	Code        string `json:"code"`
 	Description string `json:"description"`
 }
 
+// Error satisfies the error interface
 func (e Error) Error() string {
-	return e.Description
+	return e.Code + ": " + e.Description
 }
 
 var (
