@@ -21,6 +21,7 @@ var (
 type AuthorizationCode struct {
 	Code        Secret
 	RedirectURI string
+	Scope       []string
 	CreatedAt   time.Time
 }
 
@@ -45,13 +46,11 @@ type AuthorizationCodeGrant interface {
 	GetClientWithSecret(clientID string, clientSecret Secret) (Client, error)
 	// AuthorizeCode checks the resource owners credentials and requested scope. If successful it returns
 	// a new AuthorizationCode, otherwise, it returns an error.
-	AuthorizeCode(username string, password Secret, scope []string) error
+	AuthorizeCode(username string, password Secret, scope []string) ([]string, error)
 }
 
 // generateAuthorizationCodeGrantHandler returns an http.HandlerFunc using the provided AuthorizationCodeGrant, Template and SessionStore.
 func generateAuthorizationCodeGrantHandler(acg AuthorizationCodeGrant, template *template.Template, sessionStore *SessionStore) http.HandlerFunc {
-	// Add the token request handler for this auth type
-	tokenHandlers.AddHandler(GrantTypeAuthorizationCode, generateAuthCodeTokenRequestHandler(acg, sessionStore))
 	// Return a http.HandlerFunc
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the client
@@ -65,7 +64,7 @@ func generateAuthorizationCodeGrantHandler(acg AuthorizationCodeGrant, template 
 		rawurl := r.FormValue(ParamRedirectURI)
 		uri, err := url.Parse(rawurl)
 		if err != nil {
-			// The redirect URI is invalid, therefore, return an error and DO NOT redirect
+			// The redirect URI is an invalid url, therefore, return an error and DO NOT redirect
 			DefaultErrorHandler(w, ErrorInvalidRequest)
 			return
 		}
@@ -91,6 +90,11 @@ func generateAuthorizationCodeGrantHandler(acg AuthorizationCodeGrant, template 
 		rawScope := r.FormValue(ParamScope)
 		scope := strings.Split(rawScope, " ")
 		scope, err = client.AuthorizeScope(scope)
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			DefaultErrorHandler(w, ErrorUnauthorizedClient)
+			return
+		}
 		// If the method is POST then check resource owner credentials
 		if r.Method == "POST" {
 			err := r.ParseForm()
@@ -103,7 +107,7 @@ func generateAuthorizationCodeGrantHandler(acg AuthorizationCodeGrant, template 
 			}
 			username := r.PostFormValue("username")
 			password := r.PostFormValue("password")
-			err = acg.AuthorizeCode(username, Secret(password), scope)
+			scope, err = acg.AuthorizeCode(username, Secret(password), scope)
 			if err != nil {
 				// Render the template with the error
 				template.Execute(w, map[string]interface{}{
@@ -115,6 +119,7 @@ func generateAuthorizationCodeGrantHandler(acg AuthorizationCodeGrant, template 
 			authCode := AuthorizationCode{
 				Code:        Secret(NewToken()),
 				RedirectURI: r.FormValue(ParamRedirectURI),
+				Scope:       scope,
 				CreatedAt:   timeNow(),
 			}
 			// Store the authorization code within the session store
@@ -128,7 +133,7 @@ func generateAuthorizationCodeGrantHandler(acg AuthorizationCodeGrant, template 
 			}
 			// The AuthorizationCode has been approved therefore redirect including the code
 			values := uri.Query()
-			values.Add(ParamCode, authCode.Code.string())
+			values.Add(ParamCode, authCode.Code.RawString())
 			// If the state param was included then make sure it is passed onto the redirect
 			if r.FormValue(ParamState) != "" {
 				values.Add(ParamState, r.FormValue(ParamState))
@@ -138,14 +143,23 @@ func generateAuthorizationCodeGrantHandler(acg AuthorizationCodeGrant, template 
 			http.Redirect(w, r, urlStr, http.StatusFound)
 			return
 		}
+		actionURL := url.Values{}
+		actionURL.Add(ParamScope, strings.Join(scope, " "))
+		actionURL.Add(ParamRedirectURI, uri.String())
+		if r.FormValue(ParamState) != "" {
+			actionURL.Add(ParamState, r.FormValue(ParamState))
+		}
 		// Render the template
 		template.Execute(w, map[string]interface{}{
-			"Client": client,
-			"Scope":  scope,
+			"Client":    client,
+			"Scope":     scope,
+			"ActionURL": actionURL.Encode(),
 		})
 	}
 }
 
+// generateAuthCodeTokenRequestHandler is creates an http.HandlerFunc that can be used as a handler for token POST requests using the given
+// AuthorizationCodeGrant and SessionStore implementaiton.
 func generateAuthCodeTokenRequestHandler(acg AuthorizationCodeGrant, sessionStore *SessionStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the form
@@ -179,7 +193,7 @@ func generateAuthCodeTokenRequestHandler(acg AuthorizationCodeGrant, sessionStor
 		// Get the redirect URI, this is required if a redirect URI was used to generate the token
 		redirectURI := r.PostFormValue(ParamRedirectURI)
 		// Check that the authorization code is valid
-		err = sessionStore.CheckAuthorizationCode(Secret(code), redirectURI)
+		authCode, err := sessionStore.CheckAuthorizationCode(Secret(code), redirectURI)
 		if err != nil {
 			DefaultErrorHandler(w, err)
 			return
@@ -196,7 +210,7 @@ func generateAuthCodeTokenRequestHandler(acg AuthorizationCodeGrant, sessionStor
 			DefaultErrorHandler(w, err)
 			return
 		}
-		grant, err := sessionStore.NewGrant(client)
+		grant, err := sessionStore.NewGrant(client, authCode.Scope)
 		if err != nil {
 			DefaultErrorHandler(w, err)
 			return

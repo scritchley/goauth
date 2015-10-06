@@ -1,7 +1,5 @@
 package goauth
 
-import "fmt"
-
 // testClient implements the Client interface and is
 // intended for use only in testing.
 type testClient struct {
@@ -12,6 +10,7 @@ type testClient struct {
 	scope       []string
 }
 
+// AuthorizeScope satisfies the Client interface, returning an approved scope for the client.
 func (t *testClient) AuthorizeScope(scope []string) ([]string, error) {
 	var approvedScope []string
 	for _, requestedScope := range scope {
@@ -24,16 +23,20 @@ func (t *testClient) AuthorizeScope(scope []string) ([]string, error) {
 	return approvedScope, nil
 }
 
+// AuthorizeRedirectURI satisfies the Client interface, returning an error if the provided
+// URI is not valid.
 func (t *testClient) AuthorizeRedirectURI(uri string) error {
 	if uri != t.redirectURI {
-		return fmt.Errorf("invalid redirect URI")
+		return ErrorUnauthorizedClient
 	}
 	return nil
 }
 
+// AuthorizeResourceOwner satisfies the Client interface, return an error if the provided resource owner
+// username is not allowed or is invalid.
 func (t *testClient) AuthorizeResourceOwner(username string) error {
 	if t.username != username {
-		return fmt.Errorf("unauthorized client")
+		return ErrorUnauthorizedClient
 	}
 	return nil
 }

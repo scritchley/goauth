@@ -14,12 +14,16 @@ const (
 	ParamError            = "error"
 	ParamErrorDescription = "error_description"
 	ParamCode             = "code"
+	ParamAccessToken      = "access_token"
+	ParamExpiresIn        = "expires_in"
+	ParamTokenType        = "token_type"
 )
 
 type ResponseType string
 
 const (
-	ResponseTypeCode = "code"
+	ResponseTypeCode  = "code"
+	ResponseTypeToken = "token"
 )
 
 // GrantType is a string representing the grant type to use
@@ -29,13 +33,19 @@ type GrantType string
 const (
 	// GrantTypeAuthorizationCode is the grant type used for the Authorization Code Grant strategy.
 	GrantTypeAuthorizationCode = "authorization_code"
+	// GrantTypePassword is the grant type used for Resource Owner Password Credentials Grant strategy.
+	GrantTypePassword = "password"
+	// GrantTypeClientCredentials is the grant type used for Client Credentials Grant strategy.
+	GrantTypeClientCredentials = "client_credentials"
+	// GrantTypeRefreshToken is the grant type used for refresh token requests.
+	GrantTypeRefreshToken = "refresh_token"
 )
 
 // Secret is a string which is masked when serialized.
 type Secret string
 
 // string returns the Secret string without masking
-func (s Secret) string() string {
+func (s Secret) RawString() string {
 	return string(s)
 }
 

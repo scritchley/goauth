@@ -40,7 +40,7 @@ func TestCheckAuth(t *testing.T) {
 		"testusername",
 		"https://testuri.com",
 		[]string{"testscope"},
-	})
+	}, []string{"testscope"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestCheckAuth(t *testing.T) {
 			nil,
 			handler,
 			func(r *http.Request) {
-				r.Header.Set("Authorization", "Bearer "+grant.AccessToken.string())
+				r.Header.Set("Authorization", "Bearer "+grant.AccessToken.RawString())
 			},
 			func(r *httptest.ResponseRecorder) {
 				if r.Code != 200 {

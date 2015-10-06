@@ -32,17 +32,19 @@ func NewSessionStore(backend SessionStoreBackend) *SessionStore {
 
 // NewGrant creates a new grant and saves it in the session store returning the
 // new grant and any error that occurs.
-func (s *SessionStore) NewGrant(client Client) (Grant, error) {
+func (s *SessionStore) NewGrant(client Client, scope []string) (Grant, error) {
 	grant := Grant{}
 	// Set the client on the grant
 	grant.Client = client
+	// Set the scope
+	grant.Scope = scope
 	// Refresh to initialise the grant properties
 	grant.Refresh()
 	// Check whether there is an existing grant with this access token
 	existing, err := s.GetGrant(grant.AccessToken)
-	// If there is an existing grant then start over
+	// If there is an existing grant then return an error
 	if err == nil && existing.AccessToken == grant.AccessToken {
-		return s.NewGrant(client)
+		return grant, ErrorServerError
 	}
 	// Otherwise return the grant and add it to the session store.
 	return grant, s.PutGrant(grant)
@@ -50,20 +52,20 @@ func (s *SessionStore) NewGrant(client Client) (Grant, error) {
 
 // CheckAuthorizationCode retrieves an AuthorizationCode and validates it against the given
 // code and redirect URI. It returns an error if the code is invalid or any other errors occur.
-func (s *SessionStore) CheckAuthorizationCode(code Secret, redirectURI string) error {
+func (s *SessionStore) CheckAuthorizationCode(code Secret, redirectURI string) (AuthorizationCode, error) {
 	authCode, err := s.GetAuthorizationCode(code)
 	if err != nil {
-		return err
+		return authCode, err
 	}
 	// If set, check that RedirectURI matches the given redirectURI
 	if authCode.RedirectURI != "" && authCode.RedirectURI != redirectURI {
-		return ErrorAccessDenied
+		return authCode, ErrorAccessDenied
 	}
 	// Check that the code is not expired.
 	if authCode.IsExpired() {
-		return ErrorAccessDenied
+		return authCode, ErrorAccessDenied
 	}
-	return nil
+	return authCode, nil
 }
 
 // CheckGrant returns a Grant from the session store and checks that it has not
@@ -93,11 +95,19 @@ type MemSessionStoreBackend struct {
 	authCodes map[string]AuthorizationCode
 }
 
+func NewMemSessionStoreBackend() *MemSessionStoreBackend {
+	return &MemSessionStoreBackend{
+		&sync.Mutex{},
+		make(map[string]Grant),
+		make(map[string]AuthorizationCode),
+	}
+}
+
 // PutGrant stores a Grant in the session store.
 func (m *MemSessionStoreBackend) PutGrant(grant Grant) error {
 	m.mtx.Lock()
 	defer m.mtx.Unlock()
-	m.grants[grant.AccessToken.string()] = grant
+	m.grants[grant.AccessToken.RawString()] = grant
 	return nil
 }
 
@@ -105,7 +115,7 @@ func (m *MemSessionStoreBackend) PutGrant(grant Grant) error {
 func (m *MemSessionStoreBackend) GetGrant(accessToken Secret) (Grant, error) {
 	m.mtx.Lock()
 	defer m.mtx.Unlock()
-	if grant, ok := m.grants[accessToken.string()]; ok {
+	if grant, ok := m.grants[accessToken.RawString()]; ok {
 		return grant, nil
 	}
 	return Grant{}, ErrorAccessDenied
@@ -115,8 +125,8 @@ func (m *MemSessionStoreBackend) GetGrant(accessToken Secret) (Grant, error) {
 func (m *MemSessionStoreBackend) DeleteGrant(accessToken Secret) error {
 	m.mtx.Lock()
 	defer m.mtx.Unlock()
-	if _, ok := m.grants[accessToken.string()]; ok {
-		delete(m.grants, accessToken.string())
+	if _, ok := m.grants[accessToken.RawString()]; ok {
+		delete(m.grants, accessToken.RawString())
 		return nil
 	}
 	return ErrorServerError
@@ -126,7 +136,7 @@ func (m *MemSessionStoreBackend) DeleteGrant(accessToken Secret) error {
 func (m *MemSessionStoreBackend) PutAuthorizationCode(authCode AuthorizationCode) error {
 	m.mtx.Lock()
 	defer m.mtx.Unlock()
-	m.authCodes[authCode.Code.string()] = authCode
+	m.authCodes[authCode.Code.RawString()] = authCode
 	return nil
 }
 
@@ -134,7 +144,7 @@ func (m *MemSessionStoreBackend) PutAuthorizationCode(authCode AuthorizationCode
 func (m *MemSessionStoreBackend) GetAuthorizationCode(code Secret) (AuthorizationCode, error) {
 	m.mtx.Lock()
 	defer m.mtx.Unlock()
-	if authCode, ok := m.authCodes[code.string()]; ok {
+	if authCode, ok := m.authCodes[code.RawString()]; ok {
 		return authCode, nil
 	}
 	return AuthorizationCode{}, ErrorAccessDenied
@@ -144,8 +154,8 @@ func (m *MemSessionStoreBackend) GetAuthorizationCode(code Secret) (Authorizatio
 func (m *MemSessionStoreBackend) DeleteAuthorizationCode(code Secret) error {
 	m.mtx.Lock()
 	defer m.mtx.Unlock()
-	if _, ok := m.authCodes[code.string()]; ok {
-		delete(m.authCodes, code.string())
+	if _, ok := m.authCodes[code.RawString()]; ok {
+		delete(m.authCodes, code.RawString())
 		return nil
 	}
 	return ErrorServerError

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -69,7 +70,7 @@ type Grant struct {
 	TokenType    string
 	ExpiresIn    int
 	RefreshToken Secret
-	Scope        string
+	Scope        []string
 	CreatedAt    time.Time
 	Client       Client
 }
@@ -91,6 +92,40 @@ func (g *Grant) IsExpired() bool {
 	return true
 }
 
+func (g *Grant) CheckScope(requiredScope []string) error {
+	// For each of the required scopes check that the grant has access
+	for _, check := range requiredScope {
+		if !checkInScope(check, g.Scope) {
+			return ErrorAccessDenied
+		}
+	}
+	if g.Client != nil {
+		scope, err := g.Client.AuthorizeScope(requiredScope)
+		if err != nil {
+			return ErrorAccessDenied
+		}
+		if scope != nil {
+			// For each of the required scopes check that the client has access
+			for _, check := range requiredScope {
+				if !checkInScope(check, scope) {
+					return ErrorAccessDenied
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// checkInScope checks whether check is present in scope returning a bool.
+func checkInScope(check string, scope []string) bool {
+	for _, s := range scope {
+		if s == check {
+			return true
+		}
+	}
+	return false
+}
+
 // Write marshals the Grant into JSON, including only the required fields and writes it
 // to the provided io.Writer. It is used to return Grants in an http response.
 func (g *Grant) Write(w io.Writer) error {
@@ -101,8 +136,8 @@ func (g *Grant) Write(w io.Writer) error {
 	if g.RefreshToken != "" {
 		m["refresh_token"] = g.RefreshToken
 	}
-	if g.Scope != "" {
-		m["scope"] = g.Scope
+	if g.Scope != nil {
+		m["scope"] = strings.Join(g.Scope, " ")
 	}
 	enc := json.NewEncoder(w)
 	return enc.Encode(m)

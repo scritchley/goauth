@@ -20,16 +20,6 @@ func checkAuth(tokenType TokenType, sessionStore *SessionStore, requiredScope []
 	}
 }
 
-// checkInScope checks whether check is present in scope returning a bool.
-func checkInScope(check string, scope []string) bool {
-	for _, s := range scope {
-		if s == check {
-			return true
-		}
-	}
-	return false
-}
-
 // checkBearerAuth returns an http.HandlerFunc that authenticates requests using the bearer token authorization.
 func checkBearerAuth(sessionStore *SessionStore, requiredScope []string, handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -65,20 +55,12 @@ func checkBearerAuth(sessionStore *SessionStore, requiredScope []string, handler
 				DefaultErrorHandler(w, ErrorAccessDenied)
 				return
 			}
-			scope, err := grant.Client.AuthorizeScope(requiredScope)
+			err := grant.CheckScope(requiredScope)
 			if err != nil {
 				// If not present set status and return error
 				w.WriteHeader(http.StatusUnauthorized)
 				DefaultErrorHandler(w, ErrorAccessDenied)
-			}
-			// For each of the required scopes check that the client has access
-			for _, check := range requiredScope {
-				if !checkInScope(check, scope) {
-					// If not present set status and return error
-					w.WriteHeader(http.StatusUnauthorized)
-					DefaultErrorHandler(w, ErrorAccessDenied)
-					return
-				}
+				return
 			}
 		}
 		// Assuming all of the above checks have

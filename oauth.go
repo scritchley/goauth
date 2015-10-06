@@ -1,16 +1,47 @@
 package goauth
 
-// ImplicitGrant implements methods required to
-// perform an Implicit Grant Grant as per http://tools.ietf.org/html/rfc6749#section-4.2
-type ImplicitGrant interface {
+import (
+	"html/template"
+	"net/http"
+)
+
+const (
+	AuthorizeEnpoint = "/authorize"
+	TokenEndpoint    = "/token"
+)
+
+type Server struct {
+	sessionStore *SessionStore
+	mux          *http.ServeMux
 }
 
-// ResourceOwnerPasswordCredentialsGrant implements methods required to
-// perform a Resource Owner Password Credentials Grant as per http://tools.ietf.org/html/rfc6749#section-4.3
-type ResourceOwnerPasswordCredentialsGrant interface {
+func NewServer(sessionStore *SessionStore) *Server {
+	s := &Server{
+		sessionStore,
+		http.NewServeMux(),
+	}
+	s.mux.HandleFunc(AuthorizeEnpoint, authorizeHandler)
+	s.mux.HandleFunc(TokenEndpoint, tokenHandler)
+	return s
 }
 
-// ClientCredentialsGrant implements methods required to
-// perform a Client Credentials Grant as per http://tools.ietf.org/html/rfc6749#section-4.4
-type ClientCredentialsGrant interface {
+func (s *Server) AuthorizationCodeGrant(acg AuthorizationCodeGrant, tmpl *template.Template) {
+	tokenHandlers.AddHandler(GrantTypeAuthorizationCode, generateAuthCodeTokenRequestHandler(acg, s.sessionStore))
+	authorizeHandlers.AddHandler(ResponseTypeCode, generateAuthorizationCodeGrantHandler(acg, tmpl, s.sessionStore))
+}
+
+func (s *Server) ImplicitGrant(ig ImplicitGrant) {
+	authorizeHandlers.AddHandler(ResponseTypeToken, generateImplicitGrantHandler(ig, s.sessionStore))
+}
+
+func (s *Server) ResourceOwnerPasswordCredentialsGrant(ropcg ResourceOwnerPasswordCredentialsGrant) {
+	tokenHandlers.AddHandler(GrantTypePassword, generateResourceOwnerPasswordCredentialsGrant(ropcg, s.sessionStore))
+}
+
+func (s *Server) ClientCredentialsGrant(ccg ClientCredentialsGrant) {
+	tokenHandlers.AddHandler(GrantTypeClientCredentials, generateClientCredentialsGrantHandler(ccg, s.sessionStore))
+}
+
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.mux.ServeHTTP(w, r)
 }

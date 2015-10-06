@@ -25,27 +25,27 @@ func (t *testAuthCodeGrant) GetClient(clientID string) (Client, error) {
 	if clientID == t.client.ID {
 		return t.client, nil
 	}
-	return nil, ErrorAccessDenied
+	return nil, ErrorUnauthorizedClient
 }
 
 // GetClientWithSecret returns a Client given a clientID or an error if the client is not found. It is implemented for testing purposes only.
 func (t *testAuthCodeGrant) GetClientWithSecret(clientID string, clientSecret Secret) (Client, error) {
-	if clientID == t.client.ID && clientSecret.string() == t.client.secret {
+	if clientID == t.client.ID && clientSecret.RawString() == t.client.secret {
 		return t.client, nil
 	}
-	return nil, ErrorAccessDenied
+	return nil, ErrorUnauthorizedClient
 }
 
 // AuthorizeCode checks the username and password against the configured properties of t. It returns an error if they do not match. It
 // is implemented for testing purposes only.
-func (t *testAuthCodeGrant) AuthorizeCode(username string, password Secret, scope []string) error {
+func (t *testAuthCodeGrant) AuthorizeCode(username string, password Secret, scope []string) ([]string, error) {
 	if username != t.username {
-		return ErrorAccessDenied
+		return nil, ErrorAccessDenied
 	}
 	if password != t.password {
-		return ErrorAccessDenied
+		return nil, ErrorAccessDenied
 	}
-	return nil
+	return scope, nil
 }
 
 // TestAuthCodeHandler tests the request/response for the Authorization Code Grant Handler. It
@@ -90,10 +90,7 @@ func TestAuthCodeHandler(t *testing.T) {
 	handler := generateAuthorizationCodeGrantHandler(acg, tmpl, ss)
 
 	// Reference to the token handler for auth code grants
-	tokenHandler, ok := tokenHandlers[GrantTypeAuthorizationCode]
-	if !ok {
-		t.Error("Test failed, token handler not generated")
-	}
+	tokenHandlers[GrantTypeAuthorizationCode] = generateAuthCodeTokenRequestHandler(acg, ss)
 
 	// Generate a method to check the authentication of a request
 	securedHandler := checkAuth(TokenTypeBearer, ss, []string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
