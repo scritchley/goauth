@@ -10,38 +10,24 @@ const (
 	TokenEndpoint    = "/token"
 )
 
-type Server struct {
-	sessionStore *SessionStore
-	mux          *http.ServeMux
+func ApplyRoutes(mux *http.ServeMux) {
+	mux.HandleFunc(AuthorizeEnpoint, authorizeHandler)
+	mux.HandleFunc(TokenEndpoint, tokenHandler)
 }
 
-func NewServer(sessionStore *SessionStore) *Server {
-	s := &Server{
-		sessionStore,
-		http.NewServeMux(),
-	}
-	s.mux.HandleFunc(AuthorizeEnpoint, authorizeHandler)
-	s.mux.HandleFunc(TokenEndpoint, tokenHandler)
-	return s
+func RegisterAuthorizationCodeGrant(acg AuthorizationCodeGrant, tmpl *template.Template, ss *SessionStore) {
+	tokenHandlers.AddHandler(GrantTypeAuthorizationCode, generateAuthCodeTokenRequestHandler(acg, ss))
+	authorizeHandlers.AddHandler(ResponseTypeCode, generateAuthorizationCodeGrantHandler(acg, tmpl, ss))
 }
 
-func (s *Server) AuthorizationCodeGrant(acg AuthorizationCodeGrant, tmpl *template.Template) {
-	tokenHandlers.AddHandler(GrantTypeAuthorizationCode, generateAuthCodeTokenRequestHandler(acg, s.sessionStore))
-	authorizeHandlers.AddHandler(ResponseTypeCode, generateAuthorizationCodeGrantHandler(acg, tmpl, s.sessionStore))
+func RegisterImplicitGrant(ig ImplicitGrant, ss *SessionStore) {
+	authorizeHandlers.AddHandler(ResponseTypeToken, generateImplicitGrantHandler(ig, ss))
 }
 
-func (s *Server) ImplicitGrant(ig ImplicitGrant) {
-	authorizeHandlers.AddHandler(ResponseTypeToken, generateImplicitGrantHandler(ig, s.sessionStore))
+func RegisterResourceOwnerPasswordCredentialsGrant(ropcg ResourceOwnerPasswordCredentialsGrant, ss *SessionStore) {
+	tokenHandlers.AddHandler(GrantTypePassword, generateResourceOwnerPasswordCredentialsGrant(ropcg, ss))
 }
 
-func (s *Server) ResourceOwnerPasswordCredentialsGrant(ropcg ResourceOwnerPasswordCredentialsGrant) {
-	tokenHandlers.AddHandler(GrantTypePassword, generateResourceOwnerPasswordCredentialsGrant(ropcg, s.sessionStore))
-}
-
-func (s *Server) ClientCredentialsGrant(ccg ClientCredentialsGrant) {
-	tokenHandlers.AddHandler(GrantTypeClientCredentials, generateClientCredentialsGrantHandler(ccg, s.sessionStore))
-}
-
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.mux.ServeHTTP(w, r)
+func RegisterClientCredentialsGrant(ccg ClientCredentialsGrant, ss *SessionStore) {
+	tokenHandlers.AddHandler(GrantTypeClientCredentials, generateClientCredentialsGrantHandler(ccg, ss))
 }

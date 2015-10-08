@@ -4,7 +4,6 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"time"
 
 	"code.simon-critchley.co.uk/goauth"
 )
@@ -115,21 +114,10 @@ var example = &exampleAuthServer{
 }
 
 func main() {
-	// Test creating a new Grant and retrieving it from the session store.
-	ss := goauth.NewSessionStore(goauth.NewMemSessionStoreBackend())
 
-	// Session store
-	server := goauth.NewServer(ss)
+	goauth.ApplyRoutes(http.DefaultServeMux)
 
-	server.AuthorizationCodeGrant(example, tmpl)
+	goauth.RegisterAuthorizationCodeGrant(example, tmpl, goauth.DefaultSessionStore)
 
-	// Setup the http server
-	s := &http.Server{
-		Addr:           ":8080",
-		Handler:        server,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
-		MaxHeaderBytes: 1 << 20,
-	}
-	log.Fatal(s.ListenAndServe())
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }

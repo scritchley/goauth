@@ -2,6 +2,12 @@ package goauth
 
 import "sync"
 
+var (
+	// DefaultSessionStore is a default implementation of the session store using
+	// the MemSessionStoreBackend.
+	DefaultSessionStore = NewSessionStore(NewMemSessionStoreBackend())
+)
+
 // SessionStoreBackend implements methods for storing, retrieving and refreshing
 // existing grants and authorization codes.
 type SessionStoreBackend interface {
