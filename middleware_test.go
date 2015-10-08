@@ -34,13 +34,7 @@ func TestCheckAuth(t *testing.T) {
 		make(map[string]AuthorizationCode),
 	})
 
-	grant, err := ss.NewGrant(&testClient{
-		"testclientid",
-		"testclientsecret",
-		"testusername",
-		"https://testuri.com",
-		[]string{"testscope"},
-	}, []string{"testscope"})
+	grant, err := ss.NewGrant([]string{"testscope"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -269,7 +269,7 @@ func TestAuthCodeHandler(t *testing.T) {
 				r.SetBasicAuth("testclientid", "testclientsecret")
 			},
 			func(r *httptest.ResponseRecorder) {
-				if r.Code != 200 {
+				if r.Code != 401 {
 					t.Errorf("Test failed, status %v", r.Code)
 				}
 				expected := []byte(`{"code":"access_denied","description":"The resource owner or authorization server denied the request."}` + "\n")
@@ -308,7 +308,7 @@ func TestAuthCodeHandler(t *testing.T) {
 				r.SetBasicAuth("testclientid", "testclientsecret")
 			},
 			func(r *httptest.ResponseRecorder) {
-				if r.Code != 200 {
+				if r.Code != 401 {
 					t.Errorf("Test failed, status %v", r.Code)
 				}
 				expected := []byte(`{"code":"access_denied","description":"The resource owner or authorization server denied the request."}` + "\n")

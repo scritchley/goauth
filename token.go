@@ -16,9 +16,9 @@ type TokenType string
 
 const (
 	// TokenTypeBearer is the bearer token type.
-	TokenTypeBearer = "bearer"
+	TokenTypeBearer TokenType = "bearer"
 	// TokenTypeMac is the mac token type.
-	TokenTypeMac = "mac"
+	TokenTypeMac TokenType = "mac"
 )
 
 var (
@@ -72,14 +72,13 @@ type Grant struct {
 	RefreshToken Secret
 	Scope        []string
 	CreatedAt    time.Time
-	Client       Client
 }
 
 // Refresh refreshes the Grant providing it with a new.
 func (g *Grant) Refresh() {
 	g.AccessToken = NewToken()
 	g.RefreshToken = NewToken()
-	g.TokenType = DefaultTokenType
+	g.TokenType = string(DefaultTokenType)
 	g.ExpiresIn = DefaultTokenExpiry
 	g.CreatedAt = timeNow()
 }
@@ -97,20 +96,6 @@ func (g *Grant) CheckScope(requiredScope []string) error {
 	for _, check := range requiredScope {
 		if !checkInScope(check, g.Scope) {
 			return ErrorAccessDenied
-		}
-	}
-	if g.Client != nil {
-		scope, err := g.Client.AuthorizeScope(requiredScope)
-		if err != nil {
-			return ErrorAccessDenied
-		}
-		if scope != nil {
-			// For each of the required scopes check that the client has access
-			for _, check := range requiredScope {
-				if !checkInScope(check, scope) {
-					return ErrorAccessDenied
-				}
-			}
 		}
 	}
 	return nil

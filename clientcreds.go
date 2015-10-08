@@ -44,7 +44,7 @@ func generateClientCredentialsGrantHandler(ccg ClientCredentialsGrant, sessionSt
 			DefaultErrorHandler(w, ErrorUnauthorizedClient)
 			return
 		}
-		grant, err := sessionStore.NewGrant(client, scope)
+		grant, err := sessionStore.NewGrant(scope)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			DefaultErrorHandler(w, err)

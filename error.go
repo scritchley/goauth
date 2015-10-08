@@ -6,11 +6,11 @@ import (
 )
 
 // ErrorHandler is a function that accepts a http.ResponseWriter and Error.
-type ErrorHandler func(w http.ResponseWriter, e Error)
+type ErrorHandler func(w http.ResponseWriter, e error)
 
 var (
 	// DefaultErrorHandler can be overriden in order to implement a custom error handler.
-	DefaultErrorHandler = defaultErrorHandler
+	DefaultErrorHandler ErrorHandler = defaultErrorHandler
 )
 
 // defaultErrorHandler is the default error handler that is used for returning errors

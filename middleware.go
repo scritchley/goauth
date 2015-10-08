@@ -5,6 +5,10 @@ import (
 	"strings"
 )
 
+func SecureRoute(handler http.HandlerFunc) http.HandlerFunc {
+	return checkAuth(DefaultTokenType, DefaultSessionStore, nil, handler)
+}
+
 // checkAuth returns an http.HandlerFunc that implemtns authentication as middleware before calling the provided
 // handler.
 func checkAuth(tokenType TokenType, sessionStore *SessionStore, requiredScope []string, handler http.HandlerFunc) http.HandlerFunc {
@@ -43,18 +47,11 @@ func checkBearerAuth(sessionStore *SessionStore, requiredScope []string, handler
 		if err != nil {
 			// If not present set status and return error
 			w.WriteHeader(http.StatusUnauthorized)
-			DefaultErrorHandler(w, err)
+			DefaultErrorHandler(w, ErrorAccessDenied)
 			return
 		}
 		// If required scope is provided then check that the request is allowed
 		if requiredScope != nil {
-			if grant.Client == nil {
-				// No stored client means that the check cannot be performed so
-				// return an auth error
-				w.WriteHeader(http.StatusUnauthorized)
-				DefaultErrorHandler(w, ErrorAccessDenied)
-				return
-			}
 			err := grant.CheckScope(requiredScope)
 			if err != nil {
 				// If not present set status and return error

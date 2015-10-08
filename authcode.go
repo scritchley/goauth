@@ -23,11 +23,15 @@ type AuthorizationCode struct {
 	RedirectURI string
 	Scope       []string
 	CreatedAt   time.Time
+	ExpiresIn   time.Duration
 }
 
 // IsExpired returns true if the AuthorizationCode has expired.
 func (a AuthorizationCode) IsExpired() bool {
-	return a.CreatedAt.Add(DefaultAuthorizationCodeExpiry).Before(timeNow())
+	if a.CreatedAt.Add(a.ExpiresIn).After(timeNow()) {
+		return false
+	}
+	return true
 }
 
 // CheckRedirectURI checks the given redirect URI against the provided string.
@@ -110,22 +114,16 @@ func generateAuthorizationCodeGrantHandler(acg AuthorizationCodeGrant, template 
 			scope, err = acg.AuthorizeCode(username, Secret(password), scope)
 			if err != nil {
 				// Render the template with the error
+				w.WriteHeader(http.StatusUnauthorized)
 				template.Execute(w, map[string]interface{}{
 					"Error": fmt.Errorf("username or password invalid"),
 				})
 				return
 			}
-			// Generate a new AuthorizationCode
-			authCode := AuthorizationCode{
-				Code:        Secret(NewToken()),
-				RedirectURI: r.FormValue(ParamRedirectURI),
-				Scope:       scope,
-				CreatedAt:   timeNow(),
-			}
-			// Store the authorization code within the session store
-			err = sessionStore.PutAuthorizationCode(authCode)
+			authCode, err := sessionStore.NewAuthorizationCode(r.FormValue(ParamRedirectURI), scope)
 			if err != nil {
 				// Render the template with the error
+				w.WriteHeader(http.StatusInternalServerError)
 				template.Execute(w, map[string]interface{}{
 					"Error": fmt.Errorf("an internal server error occurred, please try again"),
 				})
@@ -176,17 +174,20 @@ func generateAuthCodeTokenRequestHandler(acg AuthorizationCodeGrant, sessionStor
 		}
 		client, err := acg.GetClientWithSecret(clientID, Secret(clientSecret))
 		if err != nil {
-			DefaultErrorHandler(w, err)
+			w.WriteHeader(http.StatusUnauthorized)
+			DefaultErrorHandler(w, ErrorUnauthorizedClient)
 			return
 		}
 		// Check that the request is using the correct grant type
 		if r.PostFormValue(ParamGrantType) != GrantTypeAuthorizationCode {
+			w.WriteHeader(http.StatusBadRequest)
 			DefaultErrorHandler(w, ErrorInvalidRequest)
 			return
 		}
 		// Get the code value from the request
 		code := r.PostFormValue(ParamCode)
 		if code == "" {
+			w.WriteHeader(http.StatusUnauthorized)
 			DefaultErrorHandler(w, ErrorAccessDenied)
 			return
 		}
@@ -195,30 +196,35 @@ func generateAuthCodeTokenRequestHandler(acg AuthorizationCodeGrant, sessionStor
 		// Check that the authorization code is valid
 		authCode, err := sessionStore.CheckAuthorizationCode(Secret(code), redirectURI)
 		if err != nil {
-			DefaultErrorHandler(w, err)
+			w.WriteHeader(http.StatusUnauthorized)
+			DefaultErrorHandler(w, ErrorAccessDenied)
 			return
 		}
 		// Also check the redirect URI against the authenticated client
 		err = client.AuthorizeRedirectURI(redirectURI)
 		if err != nil {
-			DefaultErrorHandler(w, err)
+			w.WriteHeader(http.StatusUnauthorized)
+			DefaultErrorHandler(w, ErrorUnauthorizedClient)
 			return
 		}
 		// If valid, remove the authorization code
 		err = sessionStore.DeleteAuthorizationCode(Secret(code))
 		if err != nil {
-			DefaultErrorHandler(w, err)
+			w.WriteHeader(http.StatusInternalServerError)
+			DefaultErrorHandler(w, ErrorServerError)
 			return
 		}
-		grant, err := sessionStore.NewGrant(client, authCode.Scope)
+		grant, err := sessionStore.NewGrant(authCode.Scope)
 		if err != nil {
-			DefaultErrorHandler(w, err)
+			w.WriteHeader(http.StatusInternalServerError)
+			DefaultErrorHandler(w, ErrorServerError)
 			return
 		}
 		// Write the grant to the http response
 		err = grant.Write(w)
 		if err != nil {
-			DefaultErrorHandler(w, err)
+			w.WriteHeader(http.StatusInternalServerError)
+			DefaultErrorHandler(w, ErrorServerError)
 			return
 		}
 	}

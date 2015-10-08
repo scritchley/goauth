@@ -67,7 +67,7 @@ func generateImplicitGrantHandler(ig ImplicitGrant, sessionStore *SessionStore) 
 			return
 		}
 		// Create a new grant
-		grant, err := sessionStore.NewGrant(client, scope)
+		grant, err := sessionStore.NewGrant(scope)
 		if err != nil {
 			implicitErrorRedirect(w, r, rawurl, ErrorUnauthorizedClient)
 			return

@@ -38,10 +38,8 @@ func NewSessionStore(backend SessionStoreBackend) *SessionStore {
 
 // NewGrant creates a new grant and saves it in the session store returning the
 // new grant and any error that occurs.
-func (s *SessionStore) NewGrant(client Client, scope []string) (Grant, error) {
+func (s *SessionStore) NewGrant(scope []string) (Grant, error) {
 	grant := Grant{}
-	// Set the client on the grant
-	grant.Client = client
 	// Set the scope
 	grant.Scope = scope
 	// Refresh to initialise the grant properties
@@ -49,11 +47,31 @@ func (s *SessionStore) NewGrant(client Client, scope []string) (Grant, error) {
 	// Check whether there is an existing grant with this access token
 	existing, err := s.GetGrant(grant.AccessToken)
 	// If there is an existing grant then return an error
-	if err == nil && existing.AccessToken == grant.AccessToken {
+	if err == nil && existing.AccessToken.RawString() == grant.AccessToken.RawString() {
 		return grant, ErrorServerError
 	}
 	// Otherwise return the grant and add it to the session store.
 	return grant, s.PutGrant(grant)
+}
+
+// NewAuthorizationCode creates a new authorization code and saves it in the session store returning the
+// new auth code and any error that occurs.
+func (s *SessionStore) NewAuthorizationCode(redirectURI string, scope []string) (AuthorizationCode, error) {
+	authCode := AuthorizationCode{
+		Code:        Secret(NewToken()),
+		RedirectURI: redirectURI,
+		Scope:       scope,
+		CreatedAt:   timeNow(),
+		ExpiresIn:   DefaultAuthorizationCodeExpiry,
+	}
+	// Check whether there is an existing authcode with this access token
+	existing, err := s.GetAuthorizationCode(authCode.Code)
+	// If there is an existing auth code then return an error
+	if err == nil && existing.Code.RawString() == authCode.Code.RawString() {
+		return authCode, ErrorServerError
+	}
+	// Otherwise return the auth code and add it to the session store.
+	return authCode, s.PutAuthorizationCode(authCode)
 }
 
 // CheckAuthorizationCode retrieves an AuthorizationCode and validates it against the given
