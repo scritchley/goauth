@@ -5,21 +5,15 @@ import (
 	"strings"
 )
 
-func SecureRoute(handler http.HandlerFunc) http.HandlerFunc {
-	return checkAuth(DefaultTokenType, DefaultSessionStore, nil, handler)
-}
-
-// checkAuth returns an http.HandlerFunc that implemtns authentication as middleware before calling the provided
-// handler.
-func checkAuth(tokenType TokenType, sessionStore *SessionStore, requiredScope []string, handler http.HandlerFunc) http.HandlerFunc {
-	switch tokenType {
+func (h handler) Secure(requiredScope []string, handler http.HandlerFunc) http.HandlerFunc {
+	switch DefaultTokenType {
 	case TokenTypeBearer:
-		return checkBearerAuth(sessionStore, requiredScope, handler)
+		return checkBearerAuth(h.SessionStore, requiredScope, handler)
 	case TokenTypeMac:
-		return checkMacAuth(sessionStore, requiredScope, handler)
+		return checkMacAuth(h.SessionStore, requiredScope, handler)
 	default:
 		return func(w http.ResponseWriter, r *http.Request) {
-			DefaultErrorHandler(w, ErrorServerError)
+			h.ErrorHandler(w, ErrorServerError)
 		}
 	}
 }

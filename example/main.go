@@ -57,7 +57,7 @@ func (t *exampleAuthServer) GetClientWithSecret(clientID string, clientSecret go
 	return nil, goauth.ErrorUnauthorizedClient
 }
 
-func (t *exampleAuthServer) AuthorizeCode(username string, password goauth.Secret, scope []string) ([]string, error) {
+func (t *exampleAuthServer) AuthorizeResourceOwner(username string, password goauth.Secret, scope []string) ([]string, error) {
 	if username != t.username {
 		return nil, goauth.ErrorAccessDenied
 	}
@@ -115,9 +115,7 @@ var example = &exampleAuthServer{
 
 func main() {
 
-	goauth.ApplyRoutes(http.DefaultServeMux)
+	handler := goauth.New(example)
 
-	goauth.RegisterAuthorizationCodeGrant(example, tmpl, goauth.DefaultSessionStore)
-
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8080", handler))
 }

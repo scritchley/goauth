@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 )
@@ -36,9 +35,9 @@ func (t *testAuthCodeGrant) GetClientWithSecret(clientID string, clientSecret Se
 	return nil, ErrorUnauthorizedClient
 }
 
-// AuthorizeCode checks the username and password against the configured properties of t. It returns an error if they do not match. It
+// AuthorizeResourceOwner checks the username and password against the configured properties of t. It returns an error if they do not match. It
 // is implemented for testing purposes only.
-func (t *testAuthCodeGrant) AuthorizeCode(username string, password Secret, scope []string) ([]string, error) {
+func (t *testAuthCodeGrant) AuthorizeResourceOwner(username string, password Secret, scope []string) ([]string, error) {
 	if username != t.username {
 		return nil, ErrorAccessDenied
 	}
@@ -60,45 +59,20 @@ func TestAuthCodeHandler(t *testing.T) {
 	// Set the default expiry for authorization codes to a low value
 	DefaultAuthorizationCodeExpiry = time.Millisecond
 
-	// Create a new session store using the mem backend
-	ss := NewSessionStore(&MemSessionStoreBackend{
-		&sync.Mutex{},
-		make(map[string]Grant),
-		make(map[string]AuthorizationCode),
-	})
-
-	// Create an AuthorizationCodeGrant interface.
-	acg := &testAuthCodeGrant{
-		&testClient{
-			"testclientid",
-			"testclientsecret",
-			"testusername",
-			"https://testuri.com",
-			[]string{"testscope"},
-		},
-		"testusername",
-		Secret("testpassword"),
-	}
-
-	// Create the new template
-	tmpl, err := template.New("authcodegrant").Parse(`{{.Client.ID}}|{{.Scope}}|{{.Error}}`)
+	handler := newTestHandler()
+	var err error
+	handler.AuthorizeTemplate, err = template.New("authcodegrant").Parse(`{{.Client.ID}}|{{.Scope}}|{{.Error}}`)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Generate the auth code grant handler
-	handler := generateAuthorizationCodeGrantHandler(acg, tmpl, ss)
-
-	// Reference to the token handler for auth code grants
-	tokenHandlers[GrantTypeAuthorizationCode] = generateAuthCodeTokenRequestHandler(acg, ss)
-
 	// Generate a method to check the authentication of a request
-	securedHandler := checkAuth(TokenTypeBearer, ss, []string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
+	securedHandler := handler.Secure([]string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("approved"))
 	})
 
 	// Generate a method to check the authentication of a request with a slightly different scope
-	securedHandlerDifferentScope := checkAuth(TokenTypeBearer, ss, []string{"securescope"}, func(w http.ResponseWriter, r *http.Request) {
+	securedHandlerDifferentScope := handler.Secure([]string{"securescope"}, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("approved"))
 	})
 
@@ -108,7 +82,7 @@ func TestAuthCodeHandler(t *testing.T) {
 			"GET",
 			"",
 			nil,
-			handler,
+			handler.handleAuthorizationCodeGrant,
 			func(r *http.Request) {},
 			func(r *httptest.ResponseRecorder) {
 				expected := []byte(`{"code":"unauthorized_client","description":"The client is not authorized to request an authorization code using this method."}` + "\n")
@@ -122,7 +96,7 @@ func TestAuthCodeHandler(t *testing.T) {
 			"GET",
 			"?client_id=test",
 			nil,
-			handler,
+			handler.handleAuthorizationCodeGrant,
 			func(r *http.Request) {},
 			func(r *httptest.ResponseRecorder) {
 				expected := []byte(`{"code":"unauthorized_client","description":"The client is not authorized to request an authorization code using this method."}` + "\n")
@@ -136,7 +110,7 @@ func TestAuthCodeHandler(t *testing.T) {
 			"GET",
 			"?client_id=testclientid",
 			nil,
-			handler,
+			handler.handleAuthorizationCodeGrant,
 			func(r *http.Request) {},
 			func(r *httptest.ResponseRecorder) {
 				expected := []byte(`{"code":"access_denied","description":"The resource owner or authorization server denied the request."}` + "\n")
@@ -150,7 +124,7 @@ func TestAuthCodeHandler(t *testing.T) {
 			"GET",
 			"?client_id=testclientid&redirect_uri=https://testuri.com",
 			nil,
-			handler,
+			handler.handleAuthorizationCodeGrant,
 			func(r *http.Request) {},
 			func(r *httptest.ResponseRecorder) {
 				if r.Code != 302 {
@@ -170,7 +144,7 @@ func TestAuthCodeHandler(t *testing.T) {
 			"GET",
 			"?response_type=code&client_id=testclientid&redirect_uri=https://testuri.com",
 			nil,
-			handler,
+			handler.handleAuthorizationCodeGrant,
 			func(r *http.Request) {},
 			func(r *httptest.ResponseRecorder) {
 				expected := []byte(`testclientid|[]|`)
@@ -184,7 +158,7 @@ func TestAuthCodeHandler(t *testing.T) {
 			"GET",
 			"?response_type=code&client_id=testclientid&redirect_uri=https://testuri.com&scope=testscope testscope2",
 			nil,
-			handler,
+			handler.handleAuthorizationCodeGrant,
 			func(r *http.Request) {},
 			func(r *httptest.ResponseRecorder) {
 				expected := []byte(`testclientid|[testscope]|`)
@@ -198,7 +172,7 @@ func TestAuthCodeHandler(t *testing.T) {
 			"POST",
 			"?response_type=code&client_id=testclientid&redirect_uri=https://testuri.com&scope=testscope testscope2",
 			strings.NewReader("username=test&password=test"),
-			handler,
+			handler.handleAuthorizationCodeGrant,
 			func(r *http.Request) {},
 			func(r *httptest.ResponseRecorder) {
 				expected := []byte(`||username or password invalid`)
@@ -212,7 +186,7 @@ func TestAuthCodeHandler(t *testing.T) {
 			"POST",
 			"?response_type=code&client_id=testclientid&redirect_uri=https://testuri.com&scope=testscope testscope2",
 			strings.NewReader("username=testusername&password=testpassword"),
-			handler,
+			handler.handleAuthorizationCodeGrant,
 			func(r *http.Request) {
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			},
@@ -230,7 +204,7 @@ func TestAuthCodeHandler(t *testing.T) {
 			"POST",
 			"?response_type=code&client_id=testclientid&redirect_uri=https://testuri.com&scope=testscope testscope2",
 			strings.NewReader("grant_type=authorization_code&code=testtoken&redirect_uri=https://testuri.com"),
-			tokenHandler,
+			handler.handleAuthCodeTokenRequest,
 			func(r *http.Request) {
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				r.SetBasicAuth("testclientid", "testclientsecret")
@@ -263,7 +237,7 @@ func TestAuthCodeHandler(t *testing.T) {
 			"POST",
 			"?response_type=code&client_id=testclientid&redirect_uri=https://testuri.com&scope=testscope testscope2",
 			strings.NewReader("grant_type=authorization_code&code=testtoken&redirect_uri=https://testuri.com"),
-			tokenHandler,
+			handler.handleAuthCodeTokenRequest,
 			func(r *http.Request) {
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				r.SetBasicAuth("testclientid", "testclientsecret")
@@ -283,7 +257,7 @@ func TestAuthCodeHandler(t *testing.T) {
 			"POST",
 			"?response_type=code&client_id=testclientid&redirect_uri=https://testuri.com&scope=testscope testscope2",
 			strings.NewReader("username=testusername&password=testpassword"),
-			handler,
+			handler.handleAuthorizationCodeGrant,
 			func(r *http.Request) {
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			},
@@ -301,7 +275,7 @@ func TestAuthCodeHandler(t *testing.T) {
 			"POST",
 			"?response_type=code&client_id=testclientid&redirect_uri=https://testuri.com&scope=testscope testscope2",
 			strings.NewReader("grant_type=authorization_code&code=testtoken&redirect_uri=https://testuri.com"),
-			tokenHandler,
+			handler.handleAuthCodeTokenRequest,
 			func(r *http.Request) {
 				time.Sleep(5 * time.Millisecond)
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")

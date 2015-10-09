@@ -17,6 +17,8 @@ type SessionStoreBackend interface {
 	GetGrant(accessToken Secret) (Grant, error)
 	// DeleteGrant removes an existing Grant from the session store.
 	DeleteGrant(accessToken Secret) error
+	// RefreshGrant refreshes an existing Grant returning the updated grant.
+	RefreshGrant(refreshToken Secret) (Grant, error)
 	// PutAuthorizationCode stores a new AuthorizationCode in the session store.
 	PutAuthorizationCode(authCode AuthorizationCode) error
 	// GetAuthorizationCode retrieves an existing AuthorizationCode from the session store.
@@ -154,6 +156,23 @@ func (m *MemSessionStoreBackend) DeleteGrant(accessToken Secret) error {
 		return nil
 	}
 	return ErrorServerError
+}
+
+// RefreshGrant refreshes an existing Grant returning the updated grant.
+func (m *MemSessionStoreBackend) RefreshGrant(refreshToken Secret) (Grant, error) {
+	m.mtx.Lock()
+	defer m.mtx.Unlock()
+	for k, g := range m.grants {
+		if g.RefreshToken.RawString() == refreshToken.RawString() {
+			// Remove the grant
+			delete(m.grants, k)
+			// Refresh the grant
+			g.Refresh()
+			// Return and put the grant to the session store.
+			return g, m.PutGrant(g)
+		}
+	}
+	return Grant{}, ErrorAccessDenied
 }
 
 // PutAuthorizationCode stores a AuthorizationCode in the session store.

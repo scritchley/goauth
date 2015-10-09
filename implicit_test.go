@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
-	"sync"
 	"testing"
 	"time"
 )
@@ -32,34 +31,18 @@ func TestImplicitGrantHandler(t *testing.T) {
 	// Set the default expiry for authorization codes to a low value
 	DefaultAuthorizationCodeExpiry = time.Millisecond
 
-	// Create a new session store using the mem backend
-	ss := NewSessionStore(&MemSessionStoreBackend{
-		&sync.Mutex{},
-		make(map[string]Grant),
-		make(map[string]AuthorizationCode),
-	})
+	// Create a new instance of the mem session store
+	DefaultSessionStore = NewSessionStore(NewMemSessionStoreBackend())
 
-	// Create an AuthorizationCodeGrant interface.
-	ccg := &testImplicitGrant{
-		&testClient{
-			"testclientid",
-			"testclientsecret",
-			"testusername",
-			"https://testuri.com",
-			[]string{"testscope"},
-		},
-	}
-
-	// Generate a resource owner password grant handler
-	handler := generateImplicitGrantHandler(ccg, ss)
+	handler := newTestHandler()
 
 	// Generate a method to check the authentication of a request
-	securedHandler := checkAuth(TokenTypeBearer, ss, []string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
+	securedHandler := handler.Secure([]string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("approved"))
 	})
 
 	// Generate a method to check the authentication of a request with a slightly different scope
-	securedHandlerDifferentScope := checkAuth(TokenTypeBearer, ss, []string{"securescope"}, func(w http.ResponseWriter, r *http.Request) {
+	securedHandlerDifferentScope := handler.Secure([]string{"securescope"}, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("approved"))
 	})
 
@@ -69,7 +52,7 @@ func TestImplicitGrantHandler(t *testing.T) {
 			"GET",
 			"/",
 			nil,
-			handler,
+			handler.handleImplicitGrant,
 			func(r *http.Request) {
 			},
 			func(r *httptest.ResponseRecorder) {
@@ -87,7 +70,7 @@ func TestImplicitGrantHandler(t *testing.T) {
 			"GET",
 			"/?response_type=token&client_id=testclientid&redirect_uri=https://testuri.com&scope=testscope",
 			nil,
-			handler,
+			handler.handleImplicitGrant,
 			func(r *http.Request) {
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			},

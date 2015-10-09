@@ -39,8 +39,10 @@ func TestCheckAuth(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	handler := newTestHandler()
+
 	// Create the handler
-	handler := checkAuth(TokenTypeBearer, ss, []string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
+	middlewareHandler := handler.Secure([]string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("approved"))
 	})
 
@@ -50,7 +52,7 @@ func TestCheckAuth(t *testing.T) {
 			"GET",
 			"",
 			nil,
-			handler,
+			middlewareHandler,
 			func(r *http.Request) {
 			},
 			func(r *httptest.ResponseRecorder) {
@@ -68,7 +70,7 @@ func TestCheckAuth(t *testing.T) {
 			"GET",
 			"",
 			nil,
-			handler,
+			middlewareHandler,
 			func(r *http.Request) {
 				r.Header.Set("Authorization", "Bearer "+grant.AccessToken.RawString())
 			},

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 )
@@ -27,9 +26,9 @@ func (t *testResourceOwnerPasswordGrant) GetClientWithSecret(clientID string, cl
 	return nil, ErrorUnauthorizedClient
 }
 
-// AuthorizeGrant checks the username and password against the configured properties of t. It returns an error if they do not match. It
+// AuthorizeResourceOwner checks the username and password against the configured properties of t. It returns an error if they do not match. It
 // is implemented for testing purposes only.
-func (t *testResourceOwnerPasswordGrant) AuthorizeGrant(username string, password Secret, scope []string) ([]string, error) {
+func (t *testResourceOwnerPasswordGrant) AuthorizeResourceOwner(username string, password Secret, scope []string) ([]string, error) {
 	if username != t.username {
 		return nil, ErrorAccessDenied
 	}
@@ -48,36 +47,18 @@ func TestResourceOwnerPasswordGrantHandler(t *testing.T) {
 	// Set the default expiry for authorization codes to a low value
 	DefaultAuthorizationCodeExpiry = time.Millisecond
 
-	// Create a new session store using the mem backend
-	ss := NewSessionStore(&MemSessionStoreBackend{
-		&sync.Mutex{},
-		make(map[string]Grant),
-		make(map[string]AuthorizationCode),
-	})
+	// Create a new instance of the mem session store
+	DefaultSessionStore = NewSessionStore(NewMemSessionStoreBackend())
 
-	// Create an AuthorizationCodeGrant interface.
-	ropcg := &testResourceOwnerPasswordGrant{
-		&testClient{
-			"testclientid",
-			"testclientsecret",
-			"testusername",
-			"https://testuri.com",
-			[]string{"testscope"},
-		},
-		"testusername",
-		Secret("testpassword"),
-	}
-
-	// Generate a resource owner password grant handler
-	handler := generateResourceOwnerPasswordCredentialsGrant(ropcg, ss)
+	handler := newTestHandler()
 
 	// Generate a method to check the authentication of a request
-	securedHandler := checkAuth(TokenTypeBearer, ss, []string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
+	securedHandler := handler.Secure([]string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("approved"))
 	})
 
 	// Generate a method to check the authentication of a request with a slightly different scope
-	securedHandlerDifferentScope := checkAuth(TokenTypeBearer, ss, []string{"securescope"}, func(w http.ResponseWriter, r *http.Request) {
+	securedHandlerDifferentScope := handler.Secure([]string{"securescope"}, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("approved"))
 	})
 
@@ -87,7 +68,7 @@ func TestResourceOwnerPasswordGrantHandler(t *testing.T) {
 			"POST",
 			"",
 			nil,
-			handler,
+			handler.handleResourceOwnerPasswordCredentialsGrant,
 			func(r *http.Request) {
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			},
@@ -106,7 +87,7 @@ func TestResourceOwnerPasswordGrantHandler(t *testing.T) {
 			"POST",
 			"",
 			strings.NewReader("grant_type=password"),
-			handler,
+			handler.handleResourceOwnerPasswordCredentialsGrant,
 			func(r *http.Request) {
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			},
@@ -125,7 +106,7 @@ func TestResourceOwnerPasswordGrantHandler(t *testing.T) {
 			"POST",
 			"",
 			strings.NewReader("grant_type=password&username=testusername&password=testpassword&scope=testscope"),
-			handler,
+			handler.handleResourceOwnerPasswordCredentialsGrant,
 			func(r *http.Request) {
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				r.SetBasicAuth("testclientid", "testclientsecret")

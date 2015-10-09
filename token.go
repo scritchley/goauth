@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
-	"net/http"
 	"strings"
 	"time"
 )
@@ -24,13 +23,11 @@ const (
 var (
 	// DefaultTokenExpiry is the default number of seconds
 	// that a token is
-	DefaultTokenExpiry = 3600
+	DefaultTokenExpiry = time.Hour
 	// DefaultTokenType is the default token type that should be used when creating new tokens.
 	DefaultTokenType = TokenTypeBearer
 	// NewToken is a utility method for generating a new token that can be overriden in testing.
 	NewToken = newToken
-	// tokenHandlers is a map of http.HandlerFuncs that are indexed by GrantType.
-	tokenHandlers = make(TokenHandlers)
 )
 
 // newToken generates a new token and returns it as a secret.
@@ -41,26 +38,6 @@ func newToken() Secret {
 		panic(err)
 	}
 	return Secret(base64.URLEncoding.EncodeToString(b))
-}
-
-// TokenHandlers is a map of http.Handerfuncs indexed by GrantType.
-type TokenHandlers map[GrantType]http.HandlerFunc
-
-// AddHandler adds a http.HandlerFunc indexed against the provided GrantType. Only one handler can be registered
-// against a grant type.
-func (t TokenHandlers) AddHandler(grantType GrantType, handler http.HandlerFunc) {
-	t[grantType] = handler
-}
-
-// tokenHandler is a http.HandlerFunc that can be used to satisfy token requests. If a handler is registered
-// against the requests grant type then it is used, else an error is returned in the response.
-func tokenHandler(w http.ResponseWriter, r *http.Request) {
-	grantType := r.FormValue(ParamGrantType)
-	if handler, ok := tokenHandlers[GrantType(grantType)]; ok {
-		handler(w, r)
-		return
-	}
-	DefaultErrorHandler(w, ErrorInvalidRequest)
 }
 
 // Grant represents an authorization grant consisting of an access token, an optional refresh token
@@ -79,7 +56,7 @@ func (g *Grant) Refresh() {
 	g.AccessToken = NewToken()
 	g.RefreshToken = NewToken()
 	g.TokenType = string(DefaultTokenType)
-	g.ExpiresIn = DefaultTokenExpiry
+	g.ExpiresIn = int(DefaultTokenExpiry.Seconds())
 	g.CreatedAt = timeNow()
 }
 

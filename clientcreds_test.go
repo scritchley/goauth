@@ -6,26 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 )
-
-// testClientCredentialsGrant implements the ClientCredentialsGrant interface and
-// is intended for use only in testing.
-type testClientCredentialsGrant struct {
-	client   *testClient
-	username string
-	password Secret
-}
-
-// GetClientWithSecret returns a Client given a clientID or an error if the client is not found. It is implemented for testing purposes only.
-func (t *testClientCredentialsGrant) GetClientWithSecret(clientID string, clientSecret Secret) (Client, error) {
-	if clientID == t.client.ID && clientSecret.RawString() == t.client.secret {
-		return t.client, nil
-	}
-	return nil, ErrorUnauthorizedClient
-}
 
 func TestClientCredentialsGrant(t *testing.T) {
 	// Override NewToken to return a known value
@@ -36,36 +19,18 @@ func TestClientCredentialsGrant(t *testing.T) {
 	// Set the default expiry for authorization codes to a low value
 	DefaultAuthorizationCodeExpiry = time.Millisecond
 
-	// Create a new session store using the mem backend
-	ss := NewSessionStore(&MemSessionStoreBackend{
-		&sync.Mutex{},
-		make(map[string]Grant),
-		make(map[string]AuthorizationCode),
-	})
+	// Create a new instance of the mem session store
+	DefaultSessionStore = NewSessionStore(NewMemSessionStoreBackend())
 
-	// Create an AuthorizationCodeGrant interface.
-	ccg := &testClientCredentialsGrant{
-		&testClient{
-			"testclientid",
-			"testclientsecret",
-			"testusername",
-			"https://testuri.com",
-			[]string{"testscope"},
-		},
-		"testusername",
-		Secret("testpassword"),
-	}
-
-	// Generate a resource owner password grant handler
-	handler := generateClientCredentialsGrantHandler(ccg, ss)
+	handler := newTestHandler()
 
 	// Generate a method to check the authentication of a request
-	securedHandler := checkAuth(TokenTypeBearer, ss, []string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
+	securedHandler := handler.Secure([]string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("approved"))
 	})
 
 	// Generate a method to check the authentication of a request with a slightly different scope
-	securedHandlerDifferentScope := checkAuth(TokenTypeBearer, ss, []string{"securescope"}, func(w http.ResponseWriter, r *http.Request) {
+	securedHandlerDifferentScope := handler.Secure([]string{"securescope"}, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("approved"))
 	})
 
@@ -75,7 +40,7 @@ func TestClientCredentialsGrant(t *testing.T) {
 			"POST",
 			"",
 			nil,
-			handler,
+			handler.handleClientCredentialsGrant,
 			func(r *http.Request) {
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			},
@@ -94,7 +59,7 @@ func TestClientCredentialsGrant(t *testing.T) {
 			"POST",
 			"",
 			strings.NewReader("grant_type=client_credentials"),
-			handler,
+			handler.handleClientCredentialsGrant,
 			func(r *http.Request) {
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			},
@@ -113,10 +78,8 @@ func TestClientCredentialsGrant(t *testing.T) {
 			"POST",
 			"",
 			strings.NewReader("grant_type=client_credentials"),
-			handler,
+			handler.handleClientCredentialsGrant,
 			func(r *http.Request) {
-				// Remove the existing token
-				ss.DeleteGrant("testtoken")
 				// Set request properties
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				r.SetBasicAuth("testclientid", "testclientsecret")
@@ -149,10 +112,10 @@ func TestClientCredentialsGrant(t *testing.T) {
 			"POST",
 			"",
 			strings.NewReader("grant_type=client_credentials&scope=testscope"),
-			handler,
+			handler.handleClientCredentialsGrant,
 			func(r *http.Request) {
 				// Remove the existing token
-				ss.DeleteGrant("testtoken")
+				handler.SessionStore.DeleteGrant("testtoken")
 				// Set request properties
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				r.SetBasicAuth("testclientid", "testclientsecret")
