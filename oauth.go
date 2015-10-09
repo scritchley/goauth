@@ -34,8 +34,13 @@ type Authenticator interface {
 	AuthorizeResourceOwner(username string, password Secret, scope []string) ([]string, error)
 }
 
-// New creates a handler implementing the http.Handler interface.
-func New(a Authenticator) handler {
+func New(a Authenticator) http.Handler {
+	return newHandler(a)
+}
+
+// new creates a handler implementing the http.Handler interface.
+func newHandler(a Authenticator) handler {
+
 	h := handler{
 		mux:               http.NewServeMux(),
 		SessionStore:      DefaultSessionStore,

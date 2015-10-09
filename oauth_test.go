@@ -43,7 +43,7 @@ func (t *testAuthenticator) AuthorizeResourceOwner(username string, password Sec
 }
 
 func newTestHandler() handler {
-	return New(&testAuthenticator{
+	return newHandler(&testAuthenticator{
 		&testClient{
 			"testclientid",
 			"testclientsecret",
