@@ -34,15 +34,15 @@ func TestImplicitGrantHandler(t *testing.T) {
 	// Create a new instance of the mem session store
 	DefaultSessionStore = NewSessionStore(NewMemSessionStoreBackend())
 
-	handler := newTestHandler()
+	server := newTestHandler()
 
 	// Generate a method to check the authentication of a request
-	securedHandler := handler.Secure([]string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
+	securedHandler := server.Secure([]string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("approved"))
 	})
 
 	// Generate a method to check the authentication of a request with a slightly different scope
-	securedHandlerDifferentScope := handler.Secure([]string{"securescope"}, func(w http.ResponseWriter, r *http.Request) {
+	securedHandlerDifferentScope := server.Secure([]string{"securescope"}, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("approved"))
 	})
 
@@ -52,7 +52,7 @@ func TestImplicitGrantHandler(t *testing.T) {
 			"GET",
 			"/",
 			nil,
-			handler.handleImplicitGrant,
+			server.handleImplicitGrant,
 			func(r *http.Request) {
 			},
 			func(r *httptest.ResponseRecorder) {
@@ -70,7 +70,7 @@ func TestImplicitGrantHandler(t *testing.T) {
 			"GET",
 			"/?response_type=token&client_id=testclientid&redirect_uri=https://testuri.com&scope=testscope",
 			nil,
-			handler.handleImplicitGrant,
+			server.handleImplicitGrant,
 			func(r *http.Request) {
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			},

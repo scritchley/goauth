@@ -22,15 +22,15 @@ func TestClientCredentialsGrant(t *testing.T) {
 	// Create a new instance of the mem session store
 	DefaultSessionStore = NewSessionStore(NewMemSessionStoreBackend())
 
-	handler := newTestHandler()
+	server := newTestHandler()
 
 	// Generate a method to check the authentication of a request
-	securedHandler := handler.Secure([]string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
+	securedHandler := server.Secure([]string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("approved"))
 	})
 
 	// Generate a method to check the authentication of a request with a slightly different scope
-	securedHandlerDifferentScope := handler.Secure([]string{"securescope"}, func(w http.ResponseWriter, r *http.Request) {
+	securedHandlerDifferentScope := server.Secure([]string{"securescope"}, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("approved"))
 	})
 
@@ -40,7 +40,7 @@ func TestClientCredentialsGrant(t *testing.T) {
 			"POST",
 			"",
 			nil,
-			handler.handleClientCredentialsGrant,
+			server.handleClientCredentialsGrant,
 			func(r *http.Request) {
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			},
@@ -59,7 +59,7 @@ func TestClientCredentialsGrant(t *testing.T) {
 			"POST",
 			"",
 			strings.NewReader("grant_type=client_credentials"),
-			handler.handleClientCredentialsGrant,
+			server.handleClientCredentialsGrant,
 			func(r *http.Request) {
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			},
@@ -78,7 +78,7 @@ func TestClientCredentialsGrant(t *testing.T) {
 			"POST",
 			"",
 			strings.NewReader("grant_type=client_credentials"),
-			handler.handleClientCredentialsGrant,
+			server.handleClientCredentialsGrant,
 			func(r *http.Request) {
 				// Set request properties
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -112,10 +112,10 @@ func TestClientCredentialsGrant(t *testing.T) {
 			"POST",
 			"",
 			strings.NewReader("grant_type=client_credentials&scope=testscope"),
-			handler.handleClientCredentialsGrant,
+			server.handleClientCredentialsGrant,
 			func(r *http.Request) {
 				// Remove the existing token
-				handler.SessionStore.DeleteGrant("testtoken")
+				server.SessionStore.DeleteGrant("testtoken")
 				// Set request properties
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				r.SetBasicAuth("testclientid", "testclientsecret")

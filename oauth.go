@@ -10,7 +10,7 @@ const (
 	TokenEndpoint    = "/token"
 )
 
-type handler struct {
+type Server struct {
 	mux               *http.ServeMux
 	SessionStore      *SessionStore
 	ErrorHandler      ErrorHandler
@@ -34,14 +34,10 @@ type Authenticator interface {
 	AuthorizeResourceOwner(username string, password Secret, scope []string) ([]string, error)
 }
 
-func New(a Authenticator) http.Handler {
-	return newHandler(a)
-}
+// New creates a handler implementing the http.Handler interface.
+func New(a Authenticator) Server {
 
-// new creates a handler implementing the http.Handler interface.
-func newHandler(a Authenticator) handler {
-
-	h := handler{
+	s := Server{
 		mux:               http.NewServeMux(),
 		SessionStore:      DefaultSessionStore,
 		ErrorHandler:      DefaultErrorHandler,
@@ -51,29 +47,29 @@ func newHandler(a Authenticator) handler {
 		Authenticator:     a,
 	}
 	// Add the Authorization Code Grant handlers
-	h.tokenHandlers.AddHandler(GrantTypeAuthorizationCode, h.handleAuthCodeTokenRequest)
-	h.authorizeHandlers.AddHandler(ResponseTypeCode, h.handleAuthorizationCodeGrant)
+	s.tokenHandlers.AddHandler(GrantTypeAuthorizationCode, s.handleAuthCodeTokenRequest)
+	s.authorizeHandlers.AddHandler(ResponseTypeCode, s.handleAuthorizationCodeGrant)
 
 	// Add the Implicit Grant handlers
-	h.authorizeHandlers.AddHandler(ResponseTypeToken, h.handleImplicitGrant)
+	s.authorizeHandlers.AddHandler(ResponseTypeToken, s.handleImplicitGrant)
 
 	// Add the Resource Owner Password Credentials Grant handlers
-	h.tokenHandlers.AddHandler(GrantTypePassword, h.handleResourceOwnerPasswordCredentialsGrant)
+	s.tokenHandlers.AddHandler(GrantTypePassword, s.handleResourceOwnerPasswordCredentialsGrant)
 
 	// Add the Client Credentials Grant handler
-	h.tokenHandlers.AddHandler(GrantTypeClientCredentials, h.handleClientCredentialsGrant)
+	s.tokenHandlers.AddHandler(GrantTypeClientCredentials, s.handleClientCredentialsGrant)
 
 	// Configure the authorize and token handlers against the router mux
-	h.mux.HandleFunc(AuthorizeEnpoint, h.authorizeHandler)
-	h.mux.HandleFunc(TokenEndpoint, h.tokenHandler)
+	s.mux.HandleFunc(AuthorizeEnpoint, s.authorizeHandler)
+	s.mux.HandleFunc(TokenEndpoint, s.tokenHandler)
 
 	// Return the handler
-	return h
+	return s
 }
 
 // ServeHTTP implements the http.Handler interface.
-func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h.mux.ServeHTTP(w, r)
+func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.mux.ServeHTTP(w, r)
 }
 
 // TokenHandlers is a map of http.Handerfuncs indexed by GrantType.
@@ -87,13 +83,13 @@ func (t TokenHandlers) AddHandler(grantType GrantType, handler http.HandlerFunc)
 
 // tokenHandler is a http.HandlerFunc that can be used to satisfy token requests. If a handler is registered
 // against the requests grant type then it is used, else an error is returned in the response.
-func (h handler) tokenHandler(w http.ResponseWriter, r *http.Request) {
+func (s Server) tokenHandler(w http.ResponseWriter, r *http.Request) {
 	grantType := r.FormValue(ParamGrantType)
-	if handler, ok := h.tokenHandlers[GrantType(grantType)]; ok {
+	if handler, ok := s.tokenHandlers[GrantType(grantType)]; ok {
 		handler(w, r)
 		return
 	}
-	h.ErrorHandler(w, ErrorInvalidRequest)
+	s.ErrorHandler(w, ErrorInvalidRequest)
 }
 
 // AuthorizeHandlers is a map of http.Handerfuncs indexed by ResponseType.
@@ -105,11 +101,11 @@ func (a AuthorizeHandlers) AddHandler(responseType ResponseType, handler http.Ha
 	a[responseType] = handler
 }
 
-func (h handler) authorizeHandler(w http.ResponseWriter, r *http.Request) {
+func (s Server) authorizeHandler(w http.ResponseWriter, r *http.Request) {
 	responseType := r.FormValue(ParamResponseType)
-	if handler, ok := h.authorizeHandlers[ResponseType(responseType)]; ok {
+	if handler, ok := s.authorizeHandlers[ResponseType(responseType)]; ok {
 		handler(w, r)
 		return
 	}
-	h.ErrorHandler(w, ErrorInvalidRequest)
+	s.ErrorHandler(w, ErrorInvalidRequest)
 }

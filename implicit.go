@@ -15,7 +15,7 @@ type ImplicitGrant interface {
 	GetClient(clientID string) (Client, error)
 }
 
-func (h handler) handleImplicitGrant(w http.ResponseWriter, r *http.Request) {
+func (s Server) handleImplicitGrant(w http.ResponseWriter, r *http.Request) {
 	// Check that the grant type is set to password
 	if r.FormValue(ParamResponseType) != ResponseTypeToken {
 		w.WriteHeader(http.StatusBadRequest)
@@ -43,7 +43,7 @@ func (h handler) handleImplicitGrant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Find the client
-	client, err := h.Authenticator.GetClient(clientID)
+	client, err := s.Authenticator.GetClient(clientID)
 	if err != nil {
 		implicitErrorRedirect(w, r, rawurl, ErrorUnauthorizedClient)
 		return
@@ -64,7 +64,7 @@ func (h handler) handleImplicitGrant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Create a new grant
-	grant, err := h.SessionStore.NewGrant(scope)
+	grant, err := s.SessionStore.NewGrant(scope)
 	if err != nil {
 		implicitErrorRedirect(w, r, rawurl, ErrorUnauthorizedClient)
 		return

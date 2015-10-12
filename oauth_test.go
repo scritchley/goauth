@@ -42,8 +42,8 @@ func (t *testAuthenticator) AuthorizeResourceOwner(username string, password Sec
 	return scope, nil
 }
 
-func newTestHandler() handler {
-	return newHandler(&testAuthenticator{
+func newTestHandler() Server {
+	return New(&testAuthenticator{
 		&testClient{
 			"testclientid",
 			"testclientsecret",

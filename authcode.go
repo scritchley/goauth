@@ -68,27 +68,27 @@ func (a AuthorizationCode) CheckRedirectURI(s string) bool {
 	return a.RedirectURI == s
 }
 
-func (h handler) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request) {
+func (s Server) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request) {
 	// Get the client
 	clientID := r.FormValue(ParamClientID)
-	client, err := h.Authenticator.GetClient(clientID)
+	client, err := s.Authenticator.GetClient(clientID)
 	if err != nil {
 		// Failed to retrieve client, therefore, return an error and DO NOT redirect
-		h.ErrorHandler(w, ErrorUnauthorizedClient)
+		s.ErrorHandler(w, ErrorUnauthorizedClient)
 		return
 	}
 	rawurl := r.FormValue(ParamRedirectURI)
 	uri, err := url.Parse(rawurl)
 	if err != nil {
 		// The redirect URI is an invalid url, therefore, return an error and DO NOT redirect
-		h.ErrorHandler(w, ErrorInvalidRequest)
+		s.ErrorHandler(w, ErrorInvalidRequest)
 		return
 	}
 	// Ensure the redirect URI is allowed
 	err = client.AuthorizeRedirectURI(uri.String())
 	if err != nil {
 		// The redirect URI is invalid, therefore, return an error and DO NOT redirect
-		h.ErrorHandler(w, ErrorAccessDenied)
+		s.ErrorHandler(w, ErrorAccessDenied)
 		return
 	}
 	// If the response type is not code then return an error and redirect
@@ -108,7 +108,7 @@ func (h handler) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Req
 	scope, err = client.AuthorizeScope(scope)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		h.ErrorHandler(w, ErrorUnauthorizedClient)
+		s.ErrorHandler(w, ErrorUnauthorizedClient)
 		return
 	}
 	// If the method is POST then check resource owner credentials
@@ -116,27 +116,27 @@ func (h handler) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Req
 		err := r.ParseForm()
 		if err != nil {
 			// Render the template
-			h.AuthorizeTemplate.Execute(w, map[string]interface{}{
+			s.AuthorizeTemplate.Execute(w, map[string]interface{}{
 				"Error": err,
 			})
 			return
 		}
 		username := r.PostFormValue("username")
 		password := r.PostFormValue("password")
-		scope, err = h.Authenticator.AuthorizeResourceOwner(username, Secret(password), scope)
+		scope, err = s.Authenticator.AuthorizeResourceOwner(username, Secret(password), scope)
 		if err != nil {
 			// Render the template with the error
 			w.WriteHeader(http.StatusUnauthorized)
-			h.AuthorizeTemplate.Execute(w, map[string]interface{}{
+			s.AuthorizeTemplate.Execute(w, map[string]interface{}{
 				"Error": fmt.Errorf("username or password invalid"),
 			})
 			return
 		}
-		authCode, err := h.SessionStore.NewAuthorizationCode(r.FormValue(ParamRedirectURI), scope)
+		authCode, err := s.SessionStore.NewAuthorizationCode(r.FormValue(ParamRedirectURI), scope)
 		if err != nil {
 			// Render the template with the error
 			w.WriteHeader(http.StatusInternalServerError)
-			h.AuthorizeTemplate.Execute(w, map[string]interface{}{
+			s.AuthorizeTemplate.Execute(w, map[string]interface{}{
 				"Error": fmt.Errorf("an internal server error occurred, please try again"),
 			})
 			return
@@ -160,79 +160,79 @@ func (h handler) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Req
 		actionURL.Add(ParamState, r.FormValue(ParamState))
 	}
 	// Render the template
-	h.AuthorizeTemplate.Execute(w, map[string]interface{}{
+	s.AuthorizeTemplate.Execute(w, map[string]interface{}{
 		"Client":    client,
 		"Scope":     scope,
 		"ActionURL": actionURL.Encode(),
 	})
 }
 
-func (h handler) handleAuthCodeTokenRequest(w http.ResponseWriter, r *http.Request) {
+func (s Server) handleAuthCodeTokenRequest(w http.ResponseWriter, r *http.Request) {
 	// Parse the form
 	err := r.ParseForm()
 	if err != nil {
-		h.ErrorHandler(w, err)
+		s.ErrorHandler(w, err)
 		return
 	}
 	// Authorize the client using basic auth
 	clientID, clientSecret, ok := r.BasicAuth()
 	if !ok {
-		h.ErrorHandler(w, ErrorAccessDenied)
+		s.ErrorHandler(w, ErrorAccessDenied)
 		return
 	}
-	client, err := h.Authenticator.GetClientWithSecret(clientID, Secret(clientSecret))
+	client, err := s.Authenticator.GetClientWithSecret(clientID, Secret(clientSecret))
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		h.ErrorHandler(w, ErrorUnauthorizedClient)
+		s.ErrorHandler(w, ErrorUnauthorizedClient)
 		return
 	}
 	// Check that the request is using the correct grant type
 	if r.PostFormValue(ParamGrantType) != GrantTypeAuthorizationCode {
 		w.WriteHeader(http.StatusBadRequest)
-		h.ErrorHandler(w, ErrorInvalidRequest)
+		s.ErrorHandler(w, ErrorInvalidRequest)
 		return
 	}
 	// Get the code value from the request
 	code := r.PostFormValue(ParamCode)
 	if code == "" {
 		w.WriteHeader(http.StatusUnauthorized)
-		h.ErrorHandler(w, ErrorAccessDenied)
+		s.ErrorHandler(w, ErrorAccessDenied)
 		return
 	}
 	// Get the redirect URI, this is required if a redirect URI was used to generate the token
 	redirectURI := r.PostFormValue(ParamRedirectURI)
 	// Check that the authorization code is valid
-	authCode, err := h.SessionStore.CheckAuthorizationCode(Secret(code), redirectURI)
+	authCode, err := s.SessionStore.CheckAuthorizationCode(Secret(code), redirectURI)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		h.ErrorHandler(w, ErrorAccessDenied)
+		s.ErrorHandler(w, ErrorAccessDenied)
 		return
 	}
 	// Also check the redirect URI against the authenticated client
 	err = client.AuthorizeRedirectURI(redirectURI)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		h.ErrorHandler(w, ErrorUnauthorizedClient)
+		s.ErrorHandler(w, ErrorUnauthorizedClient)
 		return
 	}
 	// If valid, remove the authorization code
-	err = h.SessionStore.DeleteAuthorizationCode(Secret(code))
+	err = s.SessionStore.DeleteAuthorizationCode(Secret(code))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		h.ErrorHandler(w, ErrorServerError)
+		s.ErrorHandler(w, ErrorServerError)
 		return
 	}
-	grant, err := h.SessionStore.NewGrant(authCode.Scope)
+	grant, err := s.SessionStore.NewGrant(authCode.Scope)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		h.ErrorHandler(w, ErrorServerError)
+		s.ErrorHandler(w, ErrorServerError)
 		return
 	}
 	// Write the grant to the http response
 	err = grant.Write(w)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		h.ErrorHandler(w, ErrorServerError)
+		s.ErrorHandler(w, ErrorServerError)
 		return
 	}
 }

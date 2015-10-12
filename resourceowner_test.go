@@ -50,15 +50,15 @@ func TestResourceOwnerPasswordGrantHandler(t *testing.T) {
 	// Create a new instance of the mem session store
 	DefaultSessionStore = NewSessionStore(NewMemSessionStoreBackend())
 
-	handler := newTestHandler()
+	server := newTestHandler()
 
 	// Generate a method to check the authentication of a request
-	securedHandler := handler.Secure([]string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
+	securedHandler := server.Secure([]string{"testscope"}, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("approved"))
 	})
 
 	// Generate a method to check the authentication of a request with a slightly different scope
-	securedHandlerDifferentScope := handler.Secure([]string{"securescope"}, func(w http.ResponseWriter, r *http.Request) {
+	securedHandlerDifferentScope := server.Secure([]string{"securescope"}, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("approved"))
 	})
 
@@ -68,7 +68,7 @@ func TestResourceOwnerPasswordGrantHandler(t *testing.T) {
 			"POST",
 			"",
 			nil,
-			handler.handleResourceOwnerPasswordCredentialsGrant,
+			server.handleResourceOwnerPasswordCredentialsGrant,
 			func(r *http.Request) {
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			},
@@ -87,7 +87,7 @@ func TestResourceOwnerPasswordGrantHandler(t *testing.T) {
 			"POST",
 			"",
 			strings.NewReader("grant_type=password"),
-			handler.handleResourceOwnerPasswordCredentialsGrant,
+			server.handleResourceOwnerPasswordCredentialsGrant,
 			func(r *http.Request) {
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			},
@@ -106,7 +106,7 @@ func TestResourceOwnerPasswordGrantHandler(t *testing.T) {
 			"POST",
 			"",
 			strings.NewReader("grant_type=password&username=testusername&password=testpassword&scope=testscope"),
-			handler.handleResourceOwnerPasswordCredentialsGrant,
+			server.handleResourceOwnerPasswordCredentialsGrant,
 			func(r *http.Request) {
 				r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				r.SetBasicAuth("testclientid", "testclientsecret")
