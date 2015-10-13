@@ -31,13 +31,13 @@ var (
 )
 
 // newToken generates a new token and returns it as a secret.
-func newToken() Secret {
+func newToken() (Secret, error) {
 	b := make([]byte, 24)
 	n, err := io.ReadFull(rand.Reader, b)
 	if n != len(b) || err != nil {
-		panic(err)
+		return "", err
 	}
-	return Secret(base64.URLEncoding.EncodeToString(b))
+	return Secret(base64.URLEncoding.EncodeToString(b)), nil
 }
 
 // Grant represents an authorization grant consisting of an access token, an optional refresh token
@@ -52,12 +52,21 @@ type Grant struct {
 }
 
 // Refresh refreshes the Grant providing it with a new.
-func (g *Grant) Refresh() {
-	g.AccessToken = NewToken()
-	g.RefreshToken = NewToken()
+func (g *Grant) Refresh() error {
+	accessToken, err := NewToken()
+	if err != nil {
+		return err
+	}
+	g.AccessToken = accessToken
+	refreshToken, err := NewToken()
+	if err != nil {
+		return err
+	}
+	g.RefreshToken = refreshToken
 	g.TokenType = string(DefaultTokenType)
 	g.ExpiresIn = int(DefaultTokenExpiry.Seconds())
 	g.CreatedAt = timeNow()
+	return nil
 }
 
 // IsExpired returns true if the grant has expired, else it returns false.

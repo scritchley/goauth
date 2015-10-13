@@ -45,12 +45,15 @@ func (s *SessionStore) NewGrant(scope []string) (Grant, error) {
 	// Set the scope
 	grant.Scope = scope
 	// Refresh to initialise the grant properties
-	grant.Refresh()
+	err := grant.Refresh()
+	if err != nil {
+		return Grant{}, err
+	}
 	// Check whether there is an existing grant with this access token
 	existing, err := s.GetGrant(grant.AccessToken)
 	// If there is an existing grant then return an error
 	if err == nil && existing.AccessToken.RawString() == grant.AccessToken.RawString() {
-		return grant, ErrorServerError
+		return Grant{}, ErrorServerError
 	}
 	// Otherwise return the grant and add it to the session store.
 	return grant, s.PutGrant(grant)
@@ -59,8 +62,12 @@ func (s *SessionStore) NewGrant(scope []string) (Grant, error) {
 // NewAuthorizationCode creates a new authorization code and saves it in the session store returning the
 // new auth code and any error that occurs.
 func (s *SessionStore) NewAuthorizationCode(redirectURI string, scope []string) (AuthorizationCode, error) {
+	code, err := NewToken()
+	if err != nil {
+		return AuthorizationCode{}, err
+	}
 	authCode := AuthorizationCode{
-		Code:        Secret(NewToken()),
+		Code:        Secret(code),
 		RedirectURI: redirectURI,
 		Scope:       scope,
 		CreatedAt:   timeNow(),

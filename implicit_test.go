@@ -24,8 +24,8 @@ func (t *testImplicitGrant) GetClient(clientID string) (Client, error) {
 
 func TestImplicitGrantHandler(t *testing.T) {
 	// Override NewToken to return a known value
-	NewToken = func() Secret {
-		return Secret("testtoken")
+	NewToken = func() (Secret, error) {
+		return Secret("testtoken"), nil
 	}
 
 	// Set the default expiry for authorization codes to a low value
