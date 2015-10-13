@@ -202,7 +202,7 @@ func TestAuthCodeHandler(t *testing.T) {
 		// Should return a new access token.
 		{
 			"POST",
-			"?response_type=code&client_id=testclientid&redirect_uri=https://testuri.com&scope=testscope testscope2",
+			"",
 			strings.NewReader("grant_type=authorization_code&code=testtoken&redirect_uri=https://testuri.com"),
 			server.handleAuthCodeTokenRequest,
 			func(r *http.Request) {
@@ -235,7 +235,7 @@ func TestAuthCodeHandler(t *testing.T) {
 		// Should return access denied as using the authorization code has already been used and deleted.
 		{
 			"POST",
-			"?response_type=code&client_id=testclientid&redirect_uri=https://testuri.com&scope=testscope testscope2",
+			"",
 			strings.NewReader("grant_type=authorization_code&code=testtoken&redirect_uri=https://testuri.com"),
 			server.handleAuthCodeTokenRequest,
 			func(r *http.Request) {
@@ -273,7 +273,7 @@ func TestAuthCodeHandler(t *testing.T) {
 		// Should throw an error as the authorization code has expired
 		{
 			"POST",
-			"?response_type=code&client_id=testclientid&redirect_uri=https://testuri.com&scope=testscope testscope2",
+			"",
 			strings.NewReader("grant_type=authorization_code&code=testtoken&redirect_uri=https://testuri.com"),
 			server.handleAuthCodeTokenRequest,
 			func(r *http.Request) {
