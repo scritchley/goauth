@@ -123,6 +123,16 @@ func (s Server) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Requ
 		}
 		username := r.PostFormValue("username")
 		password := r.PostFormValue("password")
+		// Check that the client is permitted to act on behalf of the resource owner.
+		err = client.AuthorizeResourceOwner(username)
+		if err != nil {
+			// Render the template with the error
+			w.WriteHeader(http.StatusUnauthorized)
+			s.AuthorizeTemplate.Execute(w, map[string]interface{}{
+				"Error": ErrorUnauthorizedClient,
+			})
+			return
+		}
 		scope, err = s.Authenticator.AuthorizeResourceOwner(username, Secret(password), scope)
 		if err != nil {
 			// Render the template with the error
