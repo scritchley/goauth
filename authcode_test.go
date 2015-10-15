@@ -113,7 +113,7 @@ func TestAuthCodeHandler(t *testing.T) {
 			server.handleAuthorizationCodeGrant,
 			func(r *http.Request) {},
 			func(r *httptest.ResponseRecorder) {
-				expected := []byte(`{"code":"access_denied","description":"The resource owner or authorization server denied the request."}` + "\n")
+				expected := []byte(`{"code":"unauthorized_client","description":"The client is not authorized to request an authorization code using this method."}` + "\n")
 				if !bytes.Equal(r.Body.Bytes(), expected) {
 					t.Errorf("Test failed, expected %s but got %s", expected, r.Body.Bytes())
 				}

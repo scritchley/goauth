@@ -60,3 +60,12 @@ func (s Secret) render() string {
 func (s Secret) String() string {
 	return s.render()
 }
+
+type Strategy string
+
+const (
+	StrategyAuthorizationCode                Strategy = "authorization_code"
+	StrategyClientCredentials                Strategy = "client_credentials"
+	StrategyResourceOwnerPasswordCredentials Strategy = "resource_owner_password_credentials"
+	StrategyImplicit                         Strategy = "implicit"
+)

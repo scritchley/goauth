@@ -45,7 +45,7 @@ func newToken() (Secret, error) {
 type Grant struct {
 	AccessToken  Secret
 	TokenType    string
-	ExpiresIn    int
+	ExpiresIn    time.Duration
 	RefreshToken Secret
 	Scope        []string
 	CreatedAt    time.Time
@@ -64,7 +64,7 @@ func (g *Grant) Refresh() error {
 	}
 	g.RefreshToken = refreshToken
 	g.TokenType = string(DefaultTokenType)
-	g.ExpiresIn = int(DefaultTokenExpiry.Seconds())
+	g.ExpiresIn = DefaultTokenExpiry
 	g.CreatedAt = timeNow()
 	return nil
 }
@@ -103,7 +103,7 @@ func (g *Grant) Write(w io.Writer) error {
 	m := make(map[string]interface{})
 	m["access_token"] = g.AccessToken
 	m["token_type"] = g.TokenType
-	m["expires_in"] = g.ExpiresIn
+	m["expires_in"] = g.ExpiresIn.Seconds()
 	if g.RefreshToken != "" {
 		m["refresh_token"] = g.RefreshToken
 	}

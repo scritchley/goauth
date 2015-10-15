@@ -25,6 +25,20 @@ func (s Server) handleResourceOwnerPasswordCredentialsGrant(w http.ResponseWrite
 		s.ErrorHandler(w, err)
 		return
 	}
+	// Check that the client is allowed for this grant type
+	ok, err = client.AllowStrategy(StrategyResourceOwnerPasswordCredentials)
+	if err != nil {
+		// Failed to determine whether grant type allowed, return an error
+		w.WriteHeader(http.StatusInternalServerError)
+		s.ErrorHandler(w, err)
+		return
+	}
+	if !ok {
+		// The client is not authorized for the grant type, therefore, return an error
+		w.WriteHeader(http.StatusUnauthorized)
+		s.ErrorHandler(w, ErrorUnauthorizedClient)
+		return
+	}
 	// Get the username
 	username := r.PostFormValue("username")
 	if username == "" {
@@ -33,11 +47,16 @@ func (s Server) handleResourceOwnerPasswordCredentialsGrant(w http.ResponseWrite
 		return
 	}
 	// Check that the client is permitted to act on behalf of the resource owner.
-	err = client.AuthorizeResourceOwner(username)
+	allowed, err := client.AuthorizeResourceOwner(username)
 	if err != nil {
 		// An error means that the Client is not approved for this resource owner.
 		// w.WriteHeader(http.StatusUnauthorized)
 		s.ErrorHandler(w, err)
+		return
+	}
+	if !allowed {
+		// If not allowed return an unauthorized client error
+		s.ErrorHandler(w, ErrorUnauthorizedClient)
 		return
 	}
 	// Get the password

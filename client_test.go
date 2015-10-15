@@ -10,6 +10,12 @@ type testClient struct {
 	scope       []string
 }
 
+// AllowStrategy satisfies the Client interface, returning true if the client is approved for the
+// provided Strategy
+func (t *testClient) AllowStrategy(s Strategy) (bool, error) {
+	return true, nil
+}
+
 // AuthorizeScope satisfies the Client interface, returning an approved scope for the client.
 func (t *testClient) AuthorizeScope(scope []string) ([]string, error) {
 	var approvedScope []string
@@ -23,20 +29,20 @@ func (t *testClient) AuthorizeScope(scope []string) ([]string, error) {
 	return approvedScope, nil
 }
 
-// AuthorizeRedirectURI satisfies the Client interface, returning an error if the provided
-// URI is not valid.
-func (t *testClient) AuthorizeRedirectURI(uri string) error {
+// AllowRedirectURI satisfies the Client interface, returning an bool indicating whether the
+// redirect uri is allowed.
+func (t *testClient) AllowRedirectURI(uri string) bool {
 	if uri != t.redirectURI {
-		return ErrorUnauthorizedClient
+		return false
 	}
-	return nil
+	return true
 }
 
 // AuthorizeResourceOwner satisfies the Client interface, return an error if the provided resource owner
 // username is not allowed or is invalid.
-func (t *testClient) AuthorizeResourceOwner(username string) error {
+func (t *testClient) AuthorizeResourceOwner(username string) (bool, error) {
 	if t.username != username {
-		return ErrorUnauthorizedClient
+		return false, nil
 	}
-	return nil
+	return true, nil
 }

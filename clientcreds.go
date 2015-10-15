@@ -25,6 +25,20 @@ func (s Server) handleClientCredentialsGrant(w http.ResponseWriter, r *http.Requ
 		s.ErrorHandler(w, err)
 		return
 	}
+	// Check that the client is allowed for this grant type
+	ok, err = client.AllowStrategy(StrategyClientCredentials)
+	if err != nil {
+		// Failed to determine whether grant type allowed, return an error
+		w.WriteHeader(http.StatusInternalServerError)
+		s.ErrorHandler(w, err)
+		return
+	}
+	if !ok {
+		// The client is not authorized for the grant type, therefore, return an error
+		w.WriteHeader(http.StatusUnauthorized)
+		s.ErrorHandler(w, ErrorUnauthorizedClient)
+		return
+	}
 	// Get the scope (OPTIONAL)
 	rawScope := r.PostFormValue(ParamScope)
 	scope := strings.Split(rawScope, " ")

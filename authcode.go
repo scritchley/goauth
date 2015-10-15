@@ -74,6 +74,21 @@ func (s Server) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Requ
 	client, err := s.Authenticator.GetClient(clientID)
 	if err != nil {
 		// Failed to retrieve client, therefore, return an error and DO NOT redirect
+		w.WriteHeader(http.StatusUnauthorized)
+		s.ErrorHandler(w, ErrorUnauthorizedClient)
+		return
+	}
+	// Check that the client is allowed for this grant type
+	ok, err := client.AllowStrategy(StrategyAuthorizationCode)
+	if err != nil {
+		// Failed to determine whether grant type allowed, return an error
+		w.WriteHeader(http.StatusInternalServerError)
+		s.ErrorHandler(w, err)
+		return
+	}
+	if !ok {
+		// The client is not authorized for the grant type, therefore, return an error
+		w.WriteHeader(http.StatusUnauthorized)
 		s.ErrorHandler(w, ErrorUnauthorizedClient)
 		return
 	}
@@ -81,14 +96,15 @@ func (s Server) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Requ
 	uri, err := url.Parse(rawurl)
 	if err != nil {
 		// The redirect URI is an invalid url, therefore, return an error and DO NOT redirect
-		s.ErrorHandler(w, ErrorInvalidRequest)
+		w.WriteHeader(http.StatusInternalServerError)
+		s.ErrorHandler(w, err)
 		return
 	}
 	// Ensure the redirect URI is allowed
-	err = client.AuthorizeRedirectURI(uri.String())
-	if err != nil {
+	ok = client.AllowRedirectURI(uri.String())
+	if !ok {
 		// The redirect URI is invalid, therefore, return an error and DO NOT redirect
-		s.ErrorHandler(w, ErrorAccessDenied)
+		s.ErrorHandler(w, ErrorUnauthorizedClient)
 		return
 	}
 	// If the response type is not code then return an error and redirect
@@ -108,7 +124,7 @@ func (s Server) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Requ
 	scope, err = client.AuthorizeScope(scope)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		s.ErrorHandler(w, ErrorUnauthorizedClient)
+		s.ErrorHandler(w, err)
 		return
 	}
 	// If the method is POST then check resource owner credentials
@@ -124,9 +140,17 @@ func (s Server) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Requ
 		username := r.PostFormValue("username")
 		password := r.PostFormValue("password")
 		// Check that the client is permitted to act on behalf of the resource owner.
-		err = client.AuthorizeResourceOwner(username)
+		allowed, err := client.AuthorizeResourceOwner(username)
 		if err != nil {
 			// Render the template with the error
+			w.WriteHeader(http.StatusUnauthorized)
+			s.AuthorizeTemplate.Execute(w, map[string]interface{}{
+				"Error": err,
+			})
+			return
+		}
+		if !allowed {
+			// If not allowed return an unauthorized client error
 			w.WriteHeader(http.StatusUnauthorized)
 			s.AuthorizeTemplate.Execute(w, map[string]interface{}{
 				"Error": ErrorUnauthorizedClient,
@@ -196,6 +220,14 @@ func (s Server) handleAuthCodeTokenRequest(w http.ResponseWriter, r *http.Reques
 		s.ErrorHandler(w, ErrorUnauthorizedClient)
 		return
 	}
+	// Check that the client is allowed for this grant type
+	ok, err = client.AllowStrategy(StrategyAuthorizationCode)
+	if err != nil {
+		// Failed to determine whether grant type allowed, return an error
+		w.WriteHeader(http.StatusInternalServerError)
+		s.ErrorHandler(w, err)
+		return
+	}
 	// Check that the request is using the correct grant type
 	if r.PostFormValue(ParamGrantType) != GrantTypeAuthorizationCode {
 		w.WriteHeader(http.StatusBadRequest)
@@ -219,8 +251,8 @@ func (s Server) handleAuthCodeTokenRequest(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	// Also check the redirect URI against the authenticated client
-	err = client.AuthorizeRedirectURI(redirectURI)
-	if err != nil {
+	ok = client.AllowRedirectURI(redirectURI)
+	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		s.ErrorHandler(w, ErrorUnauthorizedClient)
 		return

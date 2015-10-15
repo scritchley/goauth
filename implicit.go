@@ -48,6 +48,16 @@ func (s Server) handleImplicitGrant(w http.ResponseWriter, r *http.Request) {
 		implicitErrorRedirect(w, r, rawurl, ErrorUnauthorizedClient)
 		return
 	}
+	// Check that the client is allowed for this grant type
+	ok, err := client.AllowStrategy(StrategyImplicit)
+	if err != nil {
+		implicitErrorRedirect(w, r, rawurl, ErrorServerError)
+		return
+	}
+	if !ok {
+		implicitErrorRedirect(w, r, rawurl, ErrorUnauthorizedClient)
+		return
+	}
 	// Get the scope (OPTIONAL) and authorize it
 	rawScope := r.FormValue(ParamScope)
 	scope := strings.Split(rawScope, " ")
@@ -58,8 +68,8 @@ func (s Server) handleImplicitGrant(w http.ResponseWriter, r *http.Request) {
 	}
 	// Get the redirect_uri and authorize it
 	redirectURI := r.FormValue(ParamRedirectURI)
-	err = client.AuthorizeRedirectURI(redirectURI)
-	if err != nil {
+	ok = client.AllowRedirectURI(redirectURI)
+	if !ok {
 		implicitErrorRedirect(w, r, rawurl, ErrorUnauthorizedClient)
 		return
 	}
@@ -72,7 +82,7 @@ func (s Server) handleImplicitGrant(w http.ResponseWriter, r *http.Request) {
 	// Redirect passing the grant to the redirect uri
 	frag := url.Values{}
 	frag.Add(ParamAccessToken, grant.AccessToken.RawString())
-	frag.Add(ParamExpiresIn, strconv.Itoa(grant.ExpiresIn))
+	frag.Add(ParamExpiresIn, strconv.FormatFloat(grant.ExpiresIn.Seconds(), 'f', 0, 64))
 	frag.Add(ParamTokenType, grant.TokenType)
 	frag.Add(ParamScope, strings.Join(scope, " "))
 	// If the state param was included then make sure it is passed onto the redirect
