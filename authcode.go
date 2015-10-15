@@ -79,13 +79,7 @@ func (s Server) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	// Check that the client is allowed for this grant type
-	ok, err := client.AllowStrategy(StrategyAuthorizationCode)
-	if err != nil {
-		// Failed to determine whether grant type allowed, return an error
-		w.WriteHeader(http.StatusInternalServerError)
-		s.ErrorHandler(w, err)
-		return
-	}
+	ok := client.AllowStrategy(StrategyAuthorizationCode)
 	if !ok {
 		// The client is not authorized for the grant type, therefore, return an error
 		w.WriteHeader(http.StatusUnauthorized)
@@ -221,11 +215,11 @@ func (s Server) handleAuthCodeTokenRequest(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	// Check that the client is allowed for this grant type
-	ok, err = client.AllowStrategy(StrategyAuthorizationCode)
-	if err != nil {
-		// Failed to determine whether grant type allowed, return an error
-		w.WriteHeader(http.StatusInternalServerError)
-		s.ErrorHandler(w, err)
+	ok = client.AllowStrategy(StrategyAuthorizationCode)
+	if !ok {
+		// The client is not authorized for the grant type, therefore, return an error
+		w.WriteHeader(http.StatusUnauthorized)
+		s.ErrorHandler(w, ErrorUnauthorizedClient)
 		return
 	}
 	// Check that the request is using the correct grant type

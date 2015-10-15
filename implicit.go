@@ -49,11 +49,7 @@ func (s Server) handleImplicitGrant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Check that the client is allowed for this grant type
-	ok, err := client.AllowStrategy(StrategyImplicit)
-	if err != nil {
-		implicitErrorRedirect(w, r, rawurl, ErrorServerError)
-		return
-	}
+	ok := client.AllowStrategy(StrategyImplicit)
 	if !ok {
 		implicitErrorRedirect(w, r, rawurl, ErrorUnauthorizedClient)
 		return

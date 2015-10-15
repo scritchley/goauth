@@ -26,13 +26,7 @@ func (s Server) handleResourceOwnerPasswordCredentialsGrant(w http.ResponseWrite
 		return
 	}
 	// Check that the client is allowed for this grant type
-	ok, err = client.AllowStrategy(StrategyResourceOwnerPasswordCredentials)
-	if err != nil {
-		// Failed to determine whether grant type allowed, return an error
-		w.WriteHeader(http.StatusInternalServerError)
-		s.ErrorHandler(w, err)
-		return
-	}
+	ok = client.AllowStrategy(StrategyResourceOwnerPasswordCredentials)
 	if !ok {
 		// The client is not authorized for the grant type, therefore, return an error
 		w.WriteHeader(http.StatusUnauthorized)

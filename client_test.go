@@ -12,8 +12,8 @@ type testClient struct {
 
 // AllowStrategy satisfies the Client interface, returning true if the client is approved for the
 // provided Strategy
-func (t *testClient) AllowStrategy(s Strategy) (bool, error) {
-	return true, nil
+func (t *testClient) AllowStrategy(s Strategy) bool {
+	return true
 }
 
 // AuthorizeScope satisfies the Client interface, returning an approved scope for the client.
