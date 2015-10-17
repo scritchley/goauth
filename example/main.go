@@ -87,18 +87,22 @@ func (t *exampleClient) AuthorizeScope(scope []string) ([]string, error) {
 	return approvedScope, nil
 }
 
-func (t *exampleClient) AuthorizeRedirectURI(uri string) error {
+func (t *exampleClient) AllowRedirectURI(uri string) bool {
 	if uri != t.redirectURI {
-		return goauth.ErrorUnauthorizedClient
+		return false
 	}
-	return nil
+	return true
 }
 
-func (t *exampleClient) AuthorizeResourceOwner(username string) error {
+func (t *exampleClient) AllowStrategy(s goauth.Strategy) bool {
+	return true
+}
+
+func (t *exampleClient) AuthorizeResourceOwner(username string) (bool, error) {
 	if t.username != username {
-		return goauth.ErrorUnauthorizedClient
+		return false, nil
 	}
-	return nil
+	return true, nil
 }
 
 var example = &exampleAuthServer{
