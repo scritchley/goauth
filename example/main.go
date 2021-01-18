@@ -1,41 +1,11 @@
 package main
 
 import (
-	"html/template"
 	"log"
 	"net/http"
 
-	"code.simon-critchley.co.uk/goauth"
+	"github.com/scritchley/goauth"
 )
-
-var tmpl = template.Must(template.New("authorize").Parse(`
-<!DOCTYPE html>
-<html>
-<head>
-	<title></title>
-</head>
-<body>
-{{if .Error}}
-	<h3>{{.Error}}</h3>
-{{end}}
-{{if .Client.ID}}
-	{{if .Scope}}		
-		<h3>{{.Client.ID}} has requested access using the following scope:</h3>
-		{{range .Scope}}
-		<h3>{{.}}</h3>
-		{{end}}
-	{{else}}
-		<h3>{{.Client.ID}} has requested access.</h3>
-	{{end}}
-{{end}}
-<form action="{{.ActionPath}}" method="POST">
-	<input type="text" name="username">
-	<input type="password" name="password">
-	<input type="submit" value="Login">
-</form>
-</body>
-</html>
-`))
 
 type exampleAuthServer struct {
 	client   *exampleClient

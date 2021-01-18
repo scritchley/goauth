@@ -61,7 +61,24 @@ func TestAuthCodeHandler(t *testing.T) {
 
 	server := newTestHandler()
 	var err error
-	server.AuthorizeTemplate, err = template.New("authcodegrant").Parse(`{{.Client.ID}}|{{.Scope}}|{{.Error}}`)
+	server.AuthorizationHandler = func(client Client, scope []string, authErr error, actionURL string) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t, err := template.New("authcodegrant").Parse(`{{.Client.ID}}|{{.Scope}}|{{.Error}}`)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			err = t.Execute(w, map[string]interface{}{
+				"Client":    client,
+				"Scope":     scope,
+				"Error":     authErr,
+				"ActionURL": actionURL,
+			})
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+		})
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +192,7 @@ func TestAuthCodeHandler(t *testing.T) {
 			server.handleAuthorizationCodeGrant,
 			func(r *http.Request) {},
 			func(r *httptest.ResponseRecorder) {
-				expected := []byte(`||unauthorized_client: The client is not authorized to request an authorization code using this method.`)
+				expected := []byte(`testclientid|[testscope]|unauthorized_client: The client is not authorized to request an authorization code using this method.`)
 				if !bytes.Equal(r.Body.Bytes(), expected) {
 					t.Errorf("Test failed, expected %s but got %s", expected, r.Body.Bytes())
 				}

@@ -1,7 +1,6 @@
 package goauth
 
 import (
-	"html/template"
 	"net/http"
 )
 
@@ -11,13 +10,13 @@ const (
 )
 
 type Server struct {
-	mux               *http.ServeMux
-	SessionStore      *SessionStore
-	ErrorHandler      ErrorHandler
-	Authenticator     Authenticator
-	AuthorizeTemplate *template.Template
-	authorizeHandlers AuthorizeHandlers
-	tokenHandlers     TokenHandlers
+	mux                  *http.ServeMux
+	SessionStore         *SessionStore
+	ErrorHandler         ErrorHandler
+	Authenticator        Authenticator
+	AuthorizationHandler func(client Client, scope []string, authErr error, actionURL string) http.Handler
+	authorizeHandlers    AuthorizeHandlers
+	tokenHandlers        TokenHandlers
 }
 
 // Authenticator implements methods required to perform
@@ -38,13 +37,13 @@ type Authenticator interface {
 func New(a Authenticator) Server {
 
 	s := Server{
-		mux:               http.NewServeMux(),
-		SessionStore:      DefaultSessionStore,
-		ErrorHandler:      DefaultErrorHandler,
-		tokenHandlers:     make(TokenHandlers),
-		authorizeHandlers: make(AuthorizeHandlers),
-		AuthorizeTemplate: DefaultAuthorizationTemplate,
-		Authenticator:     a,
+		mux:                  http.NewServeMux(),
+		SessionStore:         DefaultSessionStore,
+		ErrorHandler:         DefaultErrorHandler,
+		tokenHandlers:        make(TokenHandlers),
+		authorizeHandlers:    make(AuthorizeHandlers),
+		AuthorizationHandler: DefaultAuthorizationHandler,
+		Authenticator:        a,
 	}
 	// Add the Authorization Code Grant handlers
 	s.tokenHandlers.AddHandler(GrantTypeAuthorizationCode, s.handleAuthCodeTokenRequest)

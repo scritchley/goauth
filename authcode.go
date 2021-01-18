@@ -25,14 +25,14 @@ var (
 {{if .Error}}
 	<h3>{{.Error}}</h3>
 {{end}}
-{{if .Client.ID}}
+{{if .Client}}
 	{{if .Scope}}		
-		<h3>{{.Client.ID}} has requested access using the following scope:</h3>
+		<h3>{{.Client}} has requested access using the following scope:</h3>
 		{{range .Scope}}
 		<h3>{{.}}</h3>
 		{{end}}
 	{{else}}
-		<h3>{{.Client.ID}} has requested access.</h3>
+		<h3>{{.Client}} has requested access.</h3>
 	{{end}}
 {{end}}
 <form action="{{.ActionPath}}" method="POST">
@@ -43,6 +43,23 @@ var (
 </body>
 </html>
 `))
+
+	DefaultAuthorizationHandler = func(client Client, scope []string, authErr error, actionURL string) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if authErr != nil {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+			err := DefaultAuthorizationTemplate.Execute(w, map[string]interface{}{
+				"Client":    client,
+				"Scope":     scope,
+				"ActionURL": actionURL,
+				"Error":     authErr,
+			})
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+		})
+	}
 )
 
 // AuthorizationCode is a temporary authorization request
@@ -125,10 +142,7 @@ func (s Server) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Requ
 	if r.Method == "POST" {
 		err := r.ParseForm()
 		if err != nil {
-			// Render the template
-			s.AuthorizeTemplate.Execute(w, map[string]interface{}{
-				"Error": err,
-			})
+			s.AuthorizationHandler(client, nil, err, "").ServeHTTP(w, r)
 			return
 		}
 		username := r.PostFormValue("username")
@@ -136,37 +150,21 @@ func (s Server) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Requ
 		// Check that the client is permitted to act on behalf of the resource owner.
 		allowed, err := client.AuthorizeResourceOwner(username)
 		if err != nil {
-			// Render the template with the error
-			w.WriteHeader(http.StatusUnauthorized)
-			s.AuthorizeTemplate.Execute(w, map[string]interface{}{
-				"Error": err,
-			})
+			s.AuthorizationHandler(client, scope, err, "").ServeHTTP(w, r)
 			return
 		}
 		if !allowed {
-			// If not allowed return an unauthorized client error
-			w.WriteHeader(http.StatusUnauthorized)
-			s.AuthorizeTemplate.Execute(w, map[string]interface{}{
-				"Error": ErrorUnauthorizedClient,
-			})
+			s.AuthorizationHandler(client, scope, ErrorUnauthorizedClient, "").ServeHTTP(w, r)
 			return
 		}
 		scope, err = s.Authenticator.AuthorizeResourceOwner(username, Secret(password), scope)
 		if err != nil {
-			// Render the template with the error
-			w.WriteHeader(http.StatusUnauthorized)
-			s.AuthorizeTemplate.Execute(w, map[string]interface{}{
-				"Error": fmt.Errorf("username or password invalid"),
-			})
+			s.AuthorizationHandler(client, scope, fmt.Errorf("username or password invalid"), "").ServeHTTP(w, r)
 			return
 		}
 		authCode, err := s.SessionStore.NewAuthorizationCode(r.FormValue(ParamRedirectURI), scope)
 		if err != nil {
-			// Render the template with the error
-			w.WriteHeader(http.StatusInternalServerError)
-			s.AuthorizeTemplate.Execute(w, map[string]interface{}{
-				"Error": fmt.Errorf("an internal server error occurred, please try again"),
-			})
+			s.AuthorizationHandler(client, scope, fmt.Errorf("an internal server error occurred, please try again"), "").ServeHTTP(w, r)
 			return
 		}
 		// The AuthorizationCode has been approved therefore redirect including the code
@@ -187,12 +185,7 @@ func (s Server) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Requ
 	if r.FormValue(ParamState) != "" {
 		actionURL.Add(ParamState, r.FormValue(ParamState))
 	}
-	// Render the template
-	s.AuthorizeTemplate.Execute(w, map[string]interface{}{
-		"Client":    client,
-		"Scope":     scope,
-		"ActionURL": actionURL.Encode(),
-	})
+	s.AuthorizationHandler(client, scope, nil, actionURL.Encode()).ServeHTTP(w, r)
 }
 
 func (s Server) handleAuthCodeTokenRequest(w http.ResponseWriter, r *http.Request) {
