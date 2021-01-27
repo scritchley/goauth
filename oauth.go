@@ -88,7 +88,7 @@ func (s Server) tokenHandler(w http.ResponseWriter, r *http.Request) {
 		handler(w, r)
 		return
 	}
-	s.ErrorHandler(w, ErrorInvalidRequest)
+	s.ErrorHandler(w, ErrorInvalidRequest.StatusCode, ErrorInvalidRequest)
 }
 
 // AuthorizeHandlers is a map of http.Handerfuncs indexed by ResponseType.
@@ -106,5 +106,5 @@ func (s Server) authorizeHandler(w http.ResponseWriter, r *http.Request) {
 		handler(w, r)
 		return
 	}
-	s.ErrorHandler(w, ErrorInvalidRequest)
+	s.ErrorHandler(w, ErrorInvalidRequest.StatusCode, ErrorInvalidRequest)
 }

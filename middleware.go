@@ -13,7 +13,7 @@ func (s Server) Secure(requiredScope []string, handler http.HandlerFunc) http.Ha
 		return s.checkMacAuth(s.SessionStore, requiredScope, handler)
 	default:
 		return func(w http.ResponseWriter, r *http.Request) {
-			s.ErrorHandler(w, ErrorServerError)
+			s.ErrorHandler(w, ErrorServerError.StatusCode, ErrorServerError)
 		}
 	}
 }
@@ -40,14 +40,14 @@ func (s Server) checkBearerAuth(sessionStore *SessionStore, requiredScope []stri
 		accessToken, err := GetBearerToken(r)
 		if err != nil {
 			w.WriteHeader(http.StatusUnauthorized)
-			s.ErrorHandler(w, ErrorAccessDenied)
+			s.ErrorHandler(w, ErrorAccessDenied.StatusCode, ErrorAccessDenied)
 			return
 		}
 		grant, err := sessionStore.CheckGrant(accessToken)
 		if err != nil {
 			// If not present set status and return error
 			w.WriteHeader(http.StatusUnauthorized)
-			s.ErrorHandler(w, ErrorAccessDenied)
+			s.ErrorHandler(w, ErrorAccessDenied.StatusCode, ErrorAccessDenied)
 			return
 		}
 		// If required scope is provided then check that the request is allowed
@@ -56,7 +56,7 @@ func (s Server) checkBearerAuth(sessionStore *SessionStore, requiredScope []stri
 			if err != nil {
 				// If not present set status and return error
 				w.WriteHeader(http.StatusUnauthorized)
-				s.ErrorHandler(w, ErrorAccessDenied)
+				s.ErrorHandler(w, ErrorAccessDenied.StatusCode, ErrorAccessDenied)
 				return
 			}
 		}
@@ -69,6 +69,6 @@ func (s Server) checkBearerAuth(sessionStore *SessionStore, requiredScope []stri
 // checkMacAuth returns an http.HandlerFunc that is currently not implemented to accept mac token authentication. s
 func (s Server) checkMacAuth(sessionStore *SessionStore, requiredScope []string, handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		s.ErrorHandler(w, ErrorInvalidRequest)
+		s.ErrorHandler(w, ErrorInvalidRequest.StatusCode, ErrorInvalidRequest)
 	}
 }

@@ -19,21 +19,21 @@ func (s Server) handleImplicitGrant(w http.ResponseWriter, r *http.Request) {
 	// Check that the grant type is set to password
 	if r.FormValue(ParamResponseType) != ResponseTypeToken {
 		w.WriteHeader(http.StatusBadRequest)
-		DefaultErrorHandler(w, ErrorInvalidRequest)
+		DefaultErrorHandler(w, ErrorInvalidRequest.StatusCode, ErrorInvalidRequest)
 		return
 	}
 	rawurl := r.FormValue(ParamRedirectURI)
 	if rawurl == "" {
 		// The there is no redirect url then return an error
 		w.WriteHeader(http.StatusBadRequest)
-		DefaultErrorHandler(w, ErrorInvalidRequest)
+		DefaultErrorHandler(w, ErrorInvalidRequest.StatusCode, ErrorInvalidRequest)
 		return
 	}
 	uri, err := url.Parse(rawurl)
 	if err != nil {
 		// The redirect URI is an invalid url, therefore, return an error and DO NOT redirect
 		w.WriteHeader(http.StatusBadRequest)
-		DefaultErrorHandler(w, ErrorInvalidRequest)
+		DefaultErrorHandler(w, ErrorInvalidRequest.StatusCode, ErrorInvalidRequest)
 		return
 	}
 	// Get the client id
