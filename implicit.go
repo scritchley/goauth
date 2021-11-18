@@ -70,16 +70,22 @@ func (s Server) handleImplicitGrant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Create a new grant
-	grant, err := s.SessionStore.NewGrant(scope)
+	grant, err := client.CreateGrant(scope)
 	if err != nil {
 		implicitErrorRedirect(w, r, rawurl, ErrorUnauthorizedClient)
+		return
+	}
+	err = s.SessionStore.PutGrant(grant)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		s.ErrorHandler(w, ErrorServerError.StatusCode, ErrorServerError)
 		return
 	}
 	// Redirect passing the grant to the redirect uri
 	frag := url.Values{}
 	frag.Add(ParamAccessToken, grant.AccessToken.RawString())
 	frag.Add(ParamExpiresIn, strconv.FormatFloat(grant.ExpiresIn.Seconds(), 'f', 0, 64))
-	frag.Add(ParamTokenType, grant.TokenType)
+	frag.Add(ParamTokenType, string(grant.TokenType))
 	frag.Add(ParamScope, strings.Join(scope, " "))
 	// If the state param was included then make sure it is passed onto the redirect
 	if r.FormValue(ParamState) != "" {

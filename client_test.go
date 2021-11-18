@@ -1,5 +1,7 @@
 package goauth
 
+import "time"
+
 // testClient implements the Client interface and is
 // intended for use only in testing.
 type testClient struct {
@@ -45,4 +47,15 @@ func (t *testClient) AuthorizeResourceOwner(username string) (bool, error) {
 		return false, nil
 	}
 	return true, nil
+}
+
+func (t *testClient) CreateGrant(scope []string) (Grant, error) {
+	return Grant{
+		AccessToken:  "testtoken",
+		ExpiresIn:    time.Second * 3600,
+		TokenType:    TokenTypeBearer,
+		RefreshToken: "testtoken",
+		Scope:        scope,
+		CreatedAt:    time.Now(),
+	}, nil
 }

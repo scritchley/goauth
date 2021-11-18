@@ -39,9 +39,15 @@ func (s Server) handleClientCredentialsGrant(w http.ResponseWriter, r *http.Requ
 		s.ErrorHandler(w, ErrorUnauthorizedClient.StatusCode, ErrorUnauthorizedClient)
 		return
 	}
-	grant, err := s.SessionStore.NewGrant(scope)
+	grant, err := client.CreateGrant(scope)
 	if err != nil {
 		s.ErrorHandler(w, http.StatusInternalServerError, err)
+		return
+	}
+	err = s.SessionStore.PutGrant(grant)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		s.ErrorHandler(w, ErrorServerError.StatusCode, ErrorServerError)
 		return
 	}
 	// Write the grant to the http response

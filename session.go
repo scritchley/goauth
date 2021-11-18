@@ -38,27 +38,6 @@ func NewSessionStore(backend SessionStoreBackend) *SessionStore {
 	return &SessionStore{backend}
 }
 
-// NewGrant creates a new grant and saves it in the session store returning the
-// new grant and any error that occurs.
-func (s *SessionStore) NewGrant(scope []string) (Grant, error) {
-	grant := Grant{}
-	// Set the scope
-	grant.Scope = scope
-	// Refresh to initialise the grant properties
-	err := grant.Refresh()
-	if err != nil {
-		return Grant{}, err
-	}
-	// Check whether there is an existing grant with this access token
-	existing, err := s.GetGrant(grant.AccessToken)
-	// If there is an existing grant then return an error
-	if err == nil && existing.AccessToken.RawString() == grant.AccessToken.RawString() {
-		return Grant{}, ErrorServerError
-	}
-	// Otherwise return the grant and add it to the session store.
-	return grant, s.PutGrant(grant)
-}
-
 // NewAuthorizationCode creates a new authorization code and saves it in the session store returning the
 // new auth code and any error that occurs.
 func (s *SessionStore) NewAuthorizationCode(redirectURI string, scope []string) (AuthorizationCode, error) {
@@ -167,19 +146,7 @@ func (m *MemSessionStoreBackend) DeleteGrant(accessToken Secret) error {
 
 // RefreshGrant refreshes an existing Grant returning the updated grant.
 func (m *MemSessionStoreBackend) RefreshGrant(refreshToken Secret) (Grant, error) {
-	m.mtx.Lock()
-	defer m.mtx.Unlock()
-	for k, g := range m.grants {
-		if g.RefreshToken.RawString() == refreshToken.RawString() {
-			// Remove the grant
-			delete(m.grants, k)
-			// Refresh the grant
-			g.Refresh()
-			// Return and put the grant to the session store.
-			return g, m.PutGrant(g)
-		}
-	}
-	return Grant{}, ErrorAccessDenied
+	return Grant{}, ErrorServerError
 }
 
 // PutAuthorizationCode stores a AuthorizationCode in the session store.

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
-	"sync"
 	"testing"
 )
 
@@ -27,17 +26,7 @@ func TestCheckInScopeFalse(t *testing.T) {
 }
 
 func TestCheckAuth(t *testing.T) {
-	// Create a new session store using the mem backend
-	ss := NewSessionStore(&MemSessionStoreBackend{
-		&sync.Mutex{},
-		make(map[string]Grant),
-		make(map[string]AuthorizationCode),
-	})
-
-	grant, err := ss.NewGrant([]string{"testscope"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	grant := Grant{AccessToken: "testtoken", Scope: []string{"testscope"}}
 
 	handler := newTestHandler()
 

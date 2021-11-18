@@ -15,4 +15,6 @@ type Client interface {
 	// AuthorizeResourceOwner checks that the client has permission to act on behalf of the resource
 	// owner. It returns a bool indicating whether the client is allowed and an error if one occurs.
 	AuthorizeResourceOwner(username string) (bool, error)
+	// CreateGrant creates a new grant for the Client with the provided scope.
+	CreateGrant(scope []string) (Grant, error)
 }

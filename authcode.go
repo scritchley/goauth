@@ -249,7 +249,13 @@ func (s Server) handleAuthCodeTokenRequest(w http.ResponseWriter, r *http.Reques
 		s.ErrorHandler(w, ErrorServerError.StatusCode, ErrorServerError)
 		return
 	}
-	grant, err := s.SessionStore.NewGrant(authCode.Scope)
+	grant, err := client.CreateGrant(authCode.Scope)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		s.ErrorHandler(w, ErrorServerError.StatusCode, ErrorServerError)
+		return
+	}
+	err = s.SessionStore.PutGrant(grant)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		s.ErrorHandler(w, ErrorServerError.StatusCode, ErrorServerError)

@@ -44,29 +44,12 @@ func newToken() (Secret, error) {
 // and additional fields containing details of the authentication session.
 type Grant struct {
 	AccessToken  Secret
-	TokenType    string
+	TokenType    TokenType
 	ExpiresIn    time.Duration
 	RefreshToken Secret
+	IDToken      Secret
 	Scope        []string
 	CreatedAt    time.Time
-}
-
-// Refresh refreshes the Grant providing it with a new.
-func (g *Grant) Refresh() error {
-	accessToken, err := NewToken()
-	if err != nil {
-		return err
-	}
-	g.AccessToken = accessToken
-	refreshToken, err := NewToken()
-	if err != nil {
-		return err
-	}
-	g.RefreshToken = refreshToken
-	g.TokenType = string(DefaultTokenType)
-	g.ExpiresIn = DefaultTokenExpiry
-	g.CreatedAt = timeNow()
-	return nil
 }
 
 // IsExpired returns true if the grant has expired, else it returns false.
@@ -109,6 +92,9 @@ func (g *Grant) Write(w io.Writer) error {
 	}
 	if g.Scope != nil {
 		m["scope"] = strings.Join(g.Scope, " ")
+	}
+	if g.IDToken != "" {
+		m["id_token"] = g.IDToken
 	}
 	enc := json.NewEncoder(w)
 	return enc.Encode(m)

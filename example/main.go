@@ -75,6 +75,10 @@ func (t *exampleClient) AuthorizeResourceOwner(username string) (bool, error) {
 	return true, nil
 }
 
+func (t *exampleClient) CreateGrant(scope []string) (goauth.Grant, error) {
+	return goauth.Grant{}, nil
+}
+
 var example = &exampleAuthServer{
 	&exampleClient{
 		"testclientid",
