@@ -32,14 +32,14 @@ func (t *testAuthenticator) GetClientWithSecret(clientID string, clientSecret Se
 
 // AuthorizeResourceOwner checks the username and password against the configured properties of t. It returns an error if they do not match. It
 // is implemented for testing purposes only.
-func (t *testAuthenticator) AuthorizeResourceOwner(username string, password Secret, scope []string) ([]string, error) {
+func (t *testAuthenticator) AuthorizeResourceOwner(username string, password Secret, scope []string) (bool, error) {
 	if username != t.username {
-		return nil, ErrorAccessDenied
+		return false, ErrorAccessDenied
 	}
 	if password != t.password {
-		return nil, ErrorAccessDenied
+		return false, ErrorAccessDenied
 	}
-	return scope, nil
+	return true, nil
 }
 
 func newTestHandler() Server {

@@ -30,7 +30,7 @@ type Authenticator interface {
 	GetClientWithSecret(clientID string, clientSecret Secret) (Client, error)
 	// AuthorizeResourceOwner checks the resource owners credentials and requested scope. If successful it returns
 	// the approved scope, otherwise, it returns an error.
-	AuthorizeResourceOwner(username string, password Secret, scope []string) ([]string, error)
+	AuthorizeResourceOwner(username string, password Secret, scope []string) (bool, error)
 }
 
 // New creates a handler implementing the http.Handler interface.

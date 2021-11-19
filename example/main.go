@@ -27,14 +27,14 @@ func (t *exampleAuthServer) GetClientWithSecret(clientID string, clientSecret go
 	return nil, goauth.ErrorUnauthorizedClient
 }
 
-func (t *exampleAuthServer) AuthorizeResourceOwner(username string, password goauth.Secret, scope []string) ([]string, error) {
+func (t *exampleAuthServer) AuthorizeResourceOwner(username string, password goauth.Secret, scope []string) (bool, error) {
 	if username != t.username {
-		return nil, goauth.ErrorAccessDenied
+		return false, goauth.ErrorAccessDenied
 	}
 	if password != t.password {
-		return nil, goauth.ErrorAccessDenied
+		return false, goauth.ErrorAccessDenied
 	}
-	return scope, nil
+	return true, nil
 }
 
 type exampleClient struct {

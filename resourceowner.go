@@ -67,8 +67,8 @@ func (s Server) handleResourceOwnerPasswordCredentialsGrant(w http.ResponseWrite
 		return
 	}
 	// Authorize the resource owner
-	scope, err = s.Authenticator.AuthorizeResourceOwner(username, Secret(password), scope)
-	if err != nil {
+	isAuthorized, err := s.Authenticator.AuthorizeResourceOwner(username, Secret(password), scope)
+	if err != nil || !isAuthorized {
 		// If an error occurs then the client / resource owner must not have access
 		s.ErrorHandler(w, http.StatusUnauthorized, err)
 		return

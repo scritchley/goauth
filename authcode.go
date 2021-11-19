@@ -66,6 +66,7 @@ var (
 // that can be exchanged for a Grant.
 type AuthorizationCode struct {
 	Code        Secret
+	ClientID    string
 	RedirectURI string
 	Scope       []string
 	CreatedAt   time.Time
@@ -155,12 +156,16 @@ func (s Server) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Requ
 			s.AuthorizationHandler(client, scope, ErrorUnauthorizedClient, "").ServeHTTP(w, r)
 			return
 		}
-		scope, err = s.Authenticator.AuthorizeResourceOwner(username, Secret(password), scope)
+		isAuthorized, err := s.Authenticator.AuthorizeResourceOwner(username, Secret(password), scope)
 		if err != nil {
 			s.AuthorizationHandler(client, scope, fmt.Errorf("username or password invalid"), "").ServeHTTP(w, r)
 			return
 		}
-		authCode, err := s.SessionStore.NewAuthorizationCode(r.FormValue(ParamRedirectURI), scope)
+		if !isAuthorized {
+			s.AuthorizationHandler(client, scope, fmt.Errorf("not authorized for requested scope"), "").ServeHTTP(w, r)
+			return
+		}
+		authCode, err := s.SessionStore.NewAuthorizationCode(clientID, r.FormValue(ParamRedirectURI), scope)
 		if err != nil {
 			s.AuthorizationHandler(client, scope, fmt.Errorf("an internal server error occurred, please try again"), "").ServeHTTP(w, r)
 			return
@@ -231,6 +236,12 @@ func (s Server) handleAuthCodeTokenRequest(w http.ResponseWriter, r *http.Reques
 	// Check that the authorization code is valid
 	authCode, err := s.SessionStore.CheckAuthorizationCode(Secret(code), redirectURI)
 	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		s.ErrorHandler(w, ErrorAccessDenied.StatusCode, ErrorAccessDenied)
+		return
+	}
+	// Check that the auth code was created for this client
+	if authCode.ClientID != clientID {
 		w.WriteHeader(http.StatusUnauthorized)
 		s.ErrorHandler(w, ErrorAccessDenied.StatusCode, ErrorAccessDenied)
 		return

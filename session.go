@@ -40,13 +40,14 @@ func NewSessionStore(backend SessionStoreBackend) *SessionStore {
 
 // NewAuthorizationCode creates a new authorization code and saves it in the session store returning the
 // new auth code and any error that occurs.
-func (s *SessionStore) NewAuthorizationCode(redirectURI string, scope []string) (AuthorizationCode, error) {
+func (s *SessionStore) NewAuthorizationCode(clientID, redirectURI string, scope []string) (AuthorizationCode, error) {
 	code, err := NewToken()
 	if err != nil {
 		return AuthorizationCode{}, err
 	}
 	authCode := AuthorizationCode{
 		Code:        Secret(code),
+		ClientID:    clientID,
 		RedirectURI: redirectURI,
 		Scope:       scope,
 		CreatedAt:   timeNow(),
